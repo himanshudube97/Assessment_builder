@@ -1,0 +1,78 @@
+# FlowForm - Complete Docker Setup
+# Usage: docker-compose up --build
+# Access: http://localhost:3090
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowform_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flowform
+      POSTGRES_PASSWORD: flowform_secret_2024
+      POSTGRES_DB: flowform
+    ports:
+      - "5768:5432"
+    volumes:
+      - flowform_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowform -d flowform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - flowform_network
+
+  # Next.js Application (Frontend + Backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: flowform_app
+    restart: unless-stopped
+    ports:
+      - "3090:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://flowform:flowform_secret_2024@postgres:5432/flowform
+      - DB_PROVIDER=local
+      - JWT_SECRET=flowform-docker-jwt-secret-change-in-production-2024
+      - NEXT_PUBLIC_APP_URL=http://localhost:3090
+      - NEXT_PUBLIC_APP_NAME=FlowForm
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowform_network
+
+  # Database Admin UI (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: flowform_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@flowform.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - flowform_network
+    profiles:
+      - tools
+
+volumes:
+  flowform_postgres_data:
+
+networks:
+  flowform_network:
+    driver: bridge
