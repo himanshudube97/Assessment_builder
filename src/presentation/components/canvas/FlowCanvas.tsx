@@ -9,7 +9,6 @@ import { useCallback, useRef, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   Panel,
   ReactFlowProvider,
   useReactFlow,
@@ -257,23 +256,6 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
         <Controls
           className="!bg-card !border-border !shadow-md"
           showInteractive={false}
-        />
-        <MiniMap
-          className="!bg-card !border-border"
-          nodeColor={(node) => {
-            // Professional muted colors matching new palette
-            switch (node.type) {
-              case 'start':
-                return '#4ADE80'; // emerald-400
-              case 'question':
-                return '#6366F1'; // indigo-500
-              case 'end':
-                return '#8B5CF6'; // violet-500
-              default:
-                return '#64748B'; // slate-500
-            }
-          }}
-          maskColor="rgba(0, 0, 0, 0.08)"
         />
         <Panel position="top-right" className="flex gap-2">
           <button
