@@ -75,6 +75,9 @@ interface CanvasState {
   // needs to recalculate handle positions via updateNodeInternals()
   nodeToUpdateInternals: string | null;
 
+  // Derived: true when status is not 'draft' (flow structure is locked)
+  isFlowLocked: boolean;
+
   // Actions
   setAssessment: (
     id: string,
@@ -207,6 +210,7 @@ const initialState = {
   lastSavedAt: null,
   newlyAddedNodeId: null,
   nodeToUpdateInternals: null,
+  isFlowLocked: false,
 };
 
 export const useCanvasStore = create<CanvasState>()(
@@ -226,6 +230,7 @@ export const useCanvasStore = create<CanvasState>()(
               closeAt: closeAt ? new Date(closeAt) : null,
               responseCount,
               settings,
+              isFlowLocked: status !== 'draft',
             });
           },
 
@@ -233,6 +238,7 @@ export const useCanvasStore = create<CanvasState>()(
             set({
               status,
               publishedAt: publishedAt ? new Date(publishedAt) : null,
+              isFlowLocked: status !== 'draft',
             });
           },
 
@@ -284,20 +290,32 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           onNodesChange: (changes) => {
+            const locked = get().isFlowLocked;
+            // When flow is locked, only allow select & dimensions (React Flow internals)
+            const filtered = locked
+              ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions')
+              : changes;
+            if (filtered.length === 0) return;
             set((state) => ({
-              nodes: applyNodeChanges(changes, state.nodes),
-              isDirty: true,
+              nodes: applyNodeChanges(filtered, state.nodes),
+              ...(locked ? {} : { isDirty: true }),
             }));
           },
 
           onEdgesChange: (changes) => {
+            const locked = get().isFlowLocked;
+            const filtered = locked
+              ? changes.filter((c) => c.type === 'select')
+              : changes;
+            if (filtered.length === 0) return;
             set((state) => ({
-              edges: applyEdgeChanges(changes, state.edges),
-              isDirty: true,
+              edges: applyEdgeChanges(filtered, state.edges),
+              ...(locked ? {} : { isDirty: true }),
             }));
           },
 
           onConnect: (connection) => {
+            if (get().isFlowLocked) return;
             set((state) => ({
               edges: addEdge(
                 {
@@ -313,6 +331,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           addNode: (type, position) => {
+            if (get().isFlowLocked) return;
             const node =
               type === 'end'
                 ? createEndNode(position)
@@ -329,6 +348,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           addQuestionNode: (questionType, position) => {
+            if (get().isFlowLocked) return;
             const node = createQuestionNode(position, questionType);
             const rfNode = toRFNode(node);
 
@@ -342,6 +362,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           updateNodeData: (nodeId, data) => {
+            if (get().isFlowLocked) return;
             set((state) => ({
               nodes: state.nodes.map((node) =>
                 node.id === nodeId
@@ -353,6 +374,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           deleteNode: (nodeId) => {
+            if (get().isFlowLocked) return;
             set((state) => ({
               nodes: state.nodes.filter((n) => n.id !== nodeId),
               edges: state.edges.filter(
@@ -366,6 +388,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           updateEdgeCondition: (edgeId, condition) => {
+            if (get().isFlowLocked) return;
             set((state) => ({
               edgeConditionMap: { ...state.edgeConditionMap, [edgeId]: condition },
               edges: state.edges.map((edge) =>
@@ -382,6 +405,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           toggleBranching: (nodeId, enable) => {
+            if (get().isFlowLocked) return;
             const state = get();
             const node = state.nodes.find((n) => n.id === nodeId);
             if (!node) return;
@@ -487,6 +511,7 @@ export const useCanvasStore = create<CanvasState>()(
           },
 
           autoLayout: () => {
+            if (get().isFlowLocked) return;
             const state = get();
             const tidiedNodes = tidyLayout(state.nodes, {
               nodeWidth: 280,
@@ -561,3 +586,4 @@ export const useSelectedNode = () => {
 
 export const useIsDirty = () => useCanvasStore((s) => s.isDirty);
 export const useIsSaving = () => useCanvasStore((s) => s.isSaving);
+export const useIsFlowLocked = () => useCanvasStore((s) => s.isFlowLocked);

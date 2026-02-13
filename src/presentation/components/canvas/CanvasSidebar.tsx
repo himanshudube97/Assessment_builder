@@ -127,10 +127,12 @@ const questionTypes: QuestionTypeItem[] = [
 
 interface CanvasSidebarProps {
   onAddNode: (type: 'question' | 'end', questionType?: QuestionType) => void;
+  disabled?: boolean;
 }
 
 export const CanvasSidebar = memo(function CanvasSidebar({
   onAddNode,
+  disabled = false,
 }: CanvasSidebarProps) {
   const onDragStart = (
     event: React.DragEvent,
@@ -153,27 +155,29 @@ export const CanvasSidebar = memo(function CanvasSidebar({
       <div className="p-4 border-b border-border">
         <h2 className="font-semibold text-foreground">Question Types</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Drag to canvas or click to add
+          {disabled ? 'Flow is locked' : 'Drag to canvas or click to add'}
         </p>
       </div>
 
       {/* Question Types */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className={cn('flex-1 overflow-y-auto p-3 space-y-2', disabled && 'opacity-50 pointer-events-none')}>
         {questionTypes.map((item, index) => (
           <motion.div
             key={item.type}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
-            draggable
+            draggable={!disabled}
             onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, 'question', item.type)}
-            onClick={() => onAddNode('question', item.type)}
+            onClick={() => !disabled && onAddNode('question', item.type)}
             className={cn(
-              'flex items-center gap-3 p-3 rounded-xl cursor-grab active:cursor-grabbing',
+              'flex items-center gap-3 p-3 rounded-xl',
               'bg-card border border-border',
-              'hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5',
               'transition-all duration-200',
-              'group'
+              'group',
+              disabled
+                ? 'cursor-not-allowed'
+                : 'cursor-grab active:cursor-grabbing hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5'
             )}
           >
             {/* Drag indicator */}
@@ -204,20 +208,22 @@ export const CanvasSidebar = memo(function CanvasSidebar({
       </div>
 
       {/* End Node */}
-      <div className="p-3 border-t border-border">
+      <div className={cn('p-3 border-t border-border', disabled && 'opacity-50 pointer-events-none')}>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          draggable
+          draggable={!disabled}
           onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, 'end')}
-          onClick={() => onAddNode('end')}
+          onClick={() => !disabled && onAddNode('end')}
           className={cn(
-            'flex items-center gap-3 p-3 rounded-xl cursor-grab active:cursor-grabbing',
+            'flex items-center gap-3 p-3 rounded-xl',
             'bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800',
-            'hover:border-violet-400 hover:shadow-md hover:-translate-y-0.5',
             'transition-all duration-200',
-            'group'
+            'group',
+            disabled
+              ? 'cursor-not-allowed'
+              : 'cursor-grab active:cursor-grabbing hover:border-violet-400 hover:shadow-md hover:-translate-y-0.5'
           )}
         >
           <div className="text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">

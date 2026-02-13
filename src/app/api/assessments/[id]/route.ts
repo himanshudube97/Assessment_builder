@@ -67,13 +67,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Update assessment
+    // When published or closed, only allow metadata/settings changes (not flow structure)
+    const isFlowLocked = existing.status !== 'draft';
+
     const updated = await repo.update(id, {
       title: body.title,
       description: body.description,
-      nodes: body.nodes,
-      edges: body.edges,
       settings: body.settings,
+      // Only allow node/edge changes when in draft
+      ...(isFlowLocked ? {} : {
+        nodes: body.nodes,
+        edges: body.edges,
+      }),
     });
 
     return NextResponse.json(updated);

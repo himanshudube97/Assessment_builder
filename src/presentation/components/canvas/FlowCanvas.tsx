@@ -65,6 +65,7 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
   const nodeToUpdateInternals = useCanvasStore((s) => s.nodeToUpdateInternals);
   const clearNodeToUpdateInternals = useCanvasStore((s) => s.clearNodeToUpdateInternals);
+  const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
 
   // Reactive undo/redo state
   const canUndo = useStore(useCanvasStore.temporal, (s) => s.pastStates.length > 0);
@@ -233,13 +234,16 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
         edges={edgesWithHandlers}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onReconnect={onReconnect}
-        onReconnectStart={onReconnectStart}
-        onReconnectEnd={onReconnectEnd}
-        edgesUpdatable
-        onDragOver={onDragOver}
-        onDrop={onDrop}
+        onConnect={isFlowLocked ? undefined : onConnect}
+        onReconnect={isFlowLocked ? undefined : onReconnect}
+        onReconnectStart={isFlowLocked ? undefined : onReconnectStart}
+        onReconnectEnd={isFlowLocked ? undefined : onReconnectEnd}
+        edgesUpdatable={!isFlowLocked}
+        nodesDraggable={!isFlowLocked}
+        nodesConnectable={!isFlowLocked}
+        elementsSelectable
+        onDragOver={isFlowLocked ? undefined : onDragOver}
+        onDrop={isFlowLocked ? undefined : onDrop}
         onPaneClick={onPaneClick}
         onNodeClick={handleNodeClick}
         nodeTypes={nodeTypes}
@@ -262,32 +266,34 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
           className="!bg-card !border-border !shadow-md"
           showInteractive={false}
         />
-        <Panel position="top-right" className="flex gap-2">
-          <button
-            onClick={canvasUndo}
-            disabled={!canUndo}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={canvasRedo}
-            disabled={!canRedo}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Redo (Ctrl+Shift+Z)"
-          >
-            <Redo2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={autoLayout}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
-            title="Clean up overlaps and align to grid"
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Tidy Up
-          </button>
-        </Panel>
+        {!isFlowLocked && (
+          <Panel position="top-right" className="flex gap-2">
+            <button
+              onClick={canvasUndo}
+              disabled={!canUndo}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={canvasRedo}
+              disabled={!canRedo}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={autoLayout}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
+              title="Clean up overlaps and align to grid"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Tidy Up
+            </button>
+          </Panel>
+        )}
       </ReactFlow>
 
     </div>

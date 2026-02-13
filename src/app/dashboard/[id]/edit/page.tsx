@@ -19,6 +19,7 @@ import {
   Pencil,
   Globe,
   Palette,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, canvasUndo, canvasRedo, canvasClearHistory } from '@/presentation/stores/canvas.store';
@@ -56,6 +57,7 @@ export default function EditorPage({ params }: EditorPageProps) {
     isDirty,
     isSaving,
     lastSavedAt,
+    isFlowLocked,
     setAssessment,
     setStatus,
     updateTitle,
@@ -122,15 +124,17 @@ export default function EditorPage({ params }: EditorPageProps) {
       setSaving(true);
       const flowData = getFlowData();
 
+      // When flow is locked, only save metadata (title/description)
+      const payload: Record<string, unknown> = { title, description };
+      if (!isFlowLocked) {
+        payload.nodes = flowData.nodes;
+        payload.edges = flowData.edges;
+      }
+
       const response = await fetch(`/api/assessments/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          nodes: flowData.nodes,
-          edges: flowData.edges,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -143,7 +147,7 @@ export default function EditorPage({ params }: EditorPageProps) {
     } finally {
       setSaving(false);
     }
-  }, [id, title, description, isSaving, setSaving, getFlowData, markSaved]);
+  }, [id, title, description, isFlowLocked, isSaving, setSaving, getFlowData, markSaved]);
 
   // Auto-save: check every 5 seconds, save if dirty
   useEffect(() => {
@@ -345,16 +349,16 @@ export default function EditorPage({ params }: EditorPageProps) {
         e.preventDefault();
         saveAssessment();
       }
-      // Undo: Ctrl/Cmd+Z
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInputFocused) {
+      // Undo: Ctrl/Cmd+Z (disabled when flow is locked)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInputFocused && !isFlowLocked) {
         e.preventDefault();
         canvasUndo();
       }
-      // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+      // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y (disabled when flow is locked)
       if (
         (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
         ((e.metaKey || e.ctrlKey) && e.key === 'y')) &&
-        !isInputFocused
+        !isInputFocused && !isFlowLocked
       ) {
         e.preventDefault();
         canvasRedo();
@@ -367,7 +371,7 @@ export default function EditorPage({ params }: EditorPageProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveAssessment, isPreviewOpen]);
+  }, [saveAssessment, isPreviewOpen, isFlowLocked]);
 
   // Get flow data for preview
   const flowData = getFlowData();
@@ -562,11 +566,23 @@ export default function EditorPage({ params }: EditorPageProps) {
         </div>
       </header>
 
+      {/* Flow locked banner */}
+      {isFlowLocked && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>
+            This assessment is {status}. The flow structure is locked to protect response data.
+            You can still edit the title, appearance, and publish settings.
+          </span>
+        </div>
+      )}
+
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <CanvasSidebar
           onAddNode={(type, questionType) => handleAddNode(type, undefined, questionType)}
+          disabled={isFlowLocked}
         />
 
         {/* Canvas */}

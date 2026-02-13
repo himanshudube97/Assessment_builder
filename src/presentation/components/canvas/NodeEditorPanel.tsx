@@ -120,6 +120,7 @@ const questionTypeConfig: Record<
 export const NodeEditorPanel = memo(function NodeEditorPanel() {
   const isPanelOpen = useCanvasStore((s) => s.isPanelOpen);
   const closePanel = useCanvasStore((s) => s.closePanel);
+  const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
   const selectedNode = useSelectedNode();
 
   if (!selectedNode) return null;
@@ -175,7 +176,7 @@ export const NodeEditorPanel = memo(function NodeEditorPanel() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-foreground">
-                    Edit {selectedNode.type === 'start' ? 'Start' : selectedNode.type === 'end' ? 'End' : 'Question'}
+                    {isFlowLocked ? 'View' : 'Edit'} {selectedNode.type === 'start' ? 'Start' : selectedNode.type === 'end' ? 'End' : 'Question'}
                   </h2>
                   <p className="text-xs text-muted-foreground">{headerConfig.label}</p>
                 </div>
@@ -190,7 +191,7 @@ export const NodeEditorPanel = memo(function NodeEditorPanel() {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className={cn('flex-1 overflow-y-auto p-4', isFlowLocked && 'pointer-events-none opacity-60')}>
             {selectedNode.type === 'start' && (
               <StartNodeEditor
                 nodeId={selectedNode.id}
