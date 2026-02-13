@@ -1,36 +1,153 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowForm
+
+Visual canvas-based assessment and survey builder.
+
+## Tech Stack
+
+- **Frontend:** Next.js 14 (App Router), React 19, TypeScript
+- **Styling:** Tailwind CSS, shadcn/ui, Framer Motion
+- **Canvas:** React Flow
+- **Backend:** Next.js API Routes
+- **Database:** PostgreSQL (local Docker or Supabase)
+- **ORM:** Drizzle ORM
+- **Auth:** Google OAuth, JWT sessions
+- **Payments:** Stripe
+
+## Architecture
+
+```
+src/
+├── app/                    # Next.js App Router pages
+├── domain/                 # Business logic (framework-agnostic)
+│   ├── entities/          # Core business objects
+│   ├── repositories/      # Repository interfaces
+│   └── services/          # Domain services
+├── infrastructure/        # External services implementation
+│   ├── database/          # Drizzle schema, migrations, repos
+│   ├── auth/              # Authentication logic
+│   ├── sheets/            # Google Sheets integration
+│   └── payments/          # Stripe integration
+├── application/           # Use cases / application services
+│   ├── use-cases/         # Application-specific operations
+│   └── dto/               # Data transfer objects
+├── presentation/          # UI layer
+│   ├── components/        # React components
+│   ├── hooks/             # Custom React hooks
+│   ├── providers/         # Context providers
+│   └── stores/            # Zustand stores
+├── config/                # Environment & constants
+├── lib/                   # Utilities
+└── types/                 # Shared TypeScript types
+```
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- Docker Desktop (for local database)
+- npm or pnpm
+
+### Setup
+
+1. **Clone and install dependencies:**
+   ```bash
+   cd assess_app
+   npm install
+   ```
+
+2. **Set up environment variables:**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local with your values
+   ```
+
+3. **Start local database:**
+   ```bash
+   npm run db:start
+   ```
+
+4. **Run database migrations:**
+   ```bash
+   npm run db:push
+   ```
+
+5. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open in browser:**
+   ```
+   http://localhost:3000
+   ```
+
+## Database Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run db:start` | Start local PostgreSQL container |
+| `npm run db:stop` | Stop database container |
+| `npm run db:studio` | Open Drizzle Studio (database GUI) |
+| `npm run db:generate` | Generate migration from schema changes |
+| `npm run db:migrate` | Run pending migrations |
+| `npm run db:push` | Push schema changes directly (dev only) |
+| `npm run db:reset` | Reset database (delete all data) |
+
+## Environment Variables
+
+### Required for Local Development
+
+```env
+DATABASE_URL=postgresql://flowform:flowform_local_dev@localhost:5432/flowform
+DB_PROVIDER=local
+JWT_SECRET=your-secret-key-at-least-32-chars
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Required for Production
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+DATABASE_URL=postgresql://...@supabase.co:5432/postgres
+DB_PROVIDER=supabase
+JWT_SECRET=your-production-secret
+NEXT_PUBLIC_APP_URL=https://yourapp.com
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Google OAuth
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
 
-## Learn More
+# Stripe
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=...
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Switching Databases
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The app is designed to work with both local Docker Postgres and Supabase.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Local Development:**
+```env
+DATABASE_URL=postgresql://flowform:flowform_local_dev@localhost:5432/flowform
+DB_PROVIDER=local
+```
 
-## Deploy on Vercel
+**Production (Supabase):**
+```env
+DATABASE_URL=postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres
+DB_PROVIDER=supabase
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project Structure Principles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Domain Layer** - Pure business logic, no framework dependencies
+2. **Infrastructure Layer** - Database, external APIs implementations
+3. **Application Layer** - Orchestrates domain + infrastructure
+4. **Presentation Layer** - UI components, hooks, stores
+
+This separation allows:
+- Easy testing (mock repositories)
+- Database switching (local ↔ Supabase)
+- Future multi-tenancy support
+- Clean dependency flow

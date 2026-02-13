@@ -15,7 +15,8 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
 } from 'reactflow';
-import type { FlowNode, FlowEdge, QuestionType, EdgeCondition } from '@/domain/entities/flow';
+import type { FlowNode, FlowEdge, QuestionType, EdgeCondition, QuestionNodeData } from '@/domain/entities/flow';
+import type { AssessmentStatus } from '@/domain/entities/assessment';
 import {
   createQuestionNode,
   createEndNode,
@@ -35,6 +36,9 @@ interface CanvasState {
   assessmentId: string | null;
   title: string;
   description: string | null;
+  status: AssessmentStatus;
+  publishedAt: Date | null;
+  closeAt: Date | null;
 
   // Canvas data
   nodes: RFNode[];
@@ -51,7 +55,15 @@ interface CanvasState {
   newlyAddedNodeId: string | null;
 
   // Actions
-  setAssessment: (id: string, title: string, description: string | null) => void;
+  setAssessment: (
+    id: string,
+    title: string,
+    description: string | null,
+    status?: AssessmentStatus,
+    publishedAt?: Date | null,
+    closeAt?: Date | null
+  ) => void;
+  setStatus: (status: AssessmentStatus, publishedAt?: Date | null) => void;
   updateTitle: (title: string) => void;
   updateDescription: (description: string | null) => void;
   loadCanvas: (nodes: FlowNode[], edges: FlowEdge[]) => void;
@@ -72,6 +84,10 @@ interface CanvasState {
   // Edge operations
   updateEdgeCondition: (edgeId: string, condition: EdgeCondition | null) => void;
   getEdgeCondition: (edgeId: string) => EdgeCondition | null;
+
+  // Branching toggle (migrates edges when switching)
+  toggleBranching: (nodeId: string, enable: boolean) => void;
+  canDisableBranching: (nodeId: string) => boolean;
 
   // Selection
   selectNode: (nodeId: string | null) => void;
@@ -151,6 +167,9 @@ const initialState = {
   assessmentId: null,
   title: '',
   description: null,
+  status: 'draft' as AssessmentStatus,
+  publishedAt: null,
+  closeAt: null,
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -166,8 +185,22 @@ export const useCanvasStore = create<CanvasState>()(
     subscribeWithSelector((set, get) => ({
       ...initialState,
 
-      setAssessment: (id, title, description) => {
-        set({ assessmentId: id, title, description });
+      setAssessment: (id, title, description, status = 'draft', publishedAt = null, closeAt = null) => {
+        set({
+          assessmentId: id,
+          title,
+          description,
+          status,
+          publishedAt: publishedAt ? new Date(publishedAt) : null,
+          closeAt: closeAt ? new Date(closeAt) : null,
+        });
+      },
+
+      setStatus: (status, publishedAt = null) => {
+        set({
+          status,
+          publishedAt: publishedAt ? new Date(publishedAt) : null,
+        });
       },
 
       updateTitle: (title) => {
@@ -206,7 +239,7 @@ export const useCanvasStore = create<CanvasState>()(
             {
               ...connection,
               id: generateEdgeId(connection.source!, connection.target!),
-              type: 'smoothstep',
+              type: 'conditionEdge',
               style: { strokeWidth: 2 },
             },
             state.edges
@@ -282,6 +315,92 @@ export const useCanvasStore = create<CanvasState>()(
 
       getEdgeCondition: (edgeId) => {
         return edgeConditions.get(edgeId) || null;
+      },
+
+      toggleBranching: (nodeId, enable) => {
+        const state = get();
+        const node = state.nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        const nodeData = node.data as QuestionNodeData;
+        const firstOptionId = nodeData.options?.[0]?.id ?? null;
+
+        // Helper: recreate an edge with a new ID so React Flow re-routes it
+        const remakeEdge = (e: RFEdge, newSourceHandle: string | null): RFEdge => {
+          const newId = generateEdgeId(e.source, e.target);
+          // Migrate any stored condition to the new edge ID
+          const condition = edgeConditions.get(e.id);
+          if (condition) {
+            edgeConditions.set(newId, condition);
+            edgeConditions.delete(e.id);
+          }
+          return {
+            ...e,
+            id: newId,
+            sourceHandle: newSourceHandle,
+            data: { ...e.data, condition: condition ?? null },
+          };
+        };
+
+        if (enable && firstOptionId) {
+          // Step 1: Update node so option handles render in the DOM
+          set((s) => ({
+            nodes: s.nodes.map((n) =>
+              n.id === nodeId
+                ? { ...n, data: { ...n.data, enableBranching: true } as RFNode['data'] }
+                : n
+            ),
+            isDirty: true,
+          }));
+          // Step 2: After handles are in the DOM, migrate edges to first option
+          requestAnimationFrame(() => {
+            set((s) => ({
+              edges: s.edges.map((e) =>
+                e.source === nodeId && !e.sourceHandle
+                  ? remakeEdge(e, firstOptionId)
+                  : e
+              ),
+            }));
+          });
+        } else if (!enable) {
+          // Step 1: Migrate edges back to bottom handle first (while option handles still exist)
+          const seen = new Set<string>();
+          set((s) => ({
+            edges: s.edges.reduce<RFEdge[]>((acc, e) => {
+              if (e.source === nodeId && e.sourceHandle) {
+                if (!seen.has(e.target)) {
+                  seen.add(e.target);
+                  acc.push(remakeEdge(e, null));
+                }
+              } else {
+                acc.push(e);
+              }
+              return acc;
+            }, []),
+            isDirty: true,
+          }));
+          // Step 2: After edges are re-routed, remove option handles
+          requestAnimationFrame(() => {
+            set((s) => ({
+              nodes: s.nodes.map((n) =>
+                n.id === nodeId
+                  ? { ...n, data: { ...n.data, enableBranching: false } as RFNode['data'] }
+                  : n
+              ),
+            }));
+          });
+        }
+      },
+
+      canDisableBranching: (nodeId) => {
+        const state = get();
+        // Count how many distinct targets are connected from per-option handles
+        const branchEdges = state.edges.filter(
+          (e) => e.source === nodeId && e.sourceHandle
+        );
+        const uniqueTargets = new Set(branchEdges.map((e) => e.target));
+        // Allow disable only if 0 or 1 unique target (safe to collapse)
+        return uniqueTargets.size <= 1;
       },
 
       selectNode: (nodeId) => {

@@ -153,7 +153,7 @@ export default function LandingPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <CTAButton href="/dashboard" variant="primary" size="lg">
+            <CTAButton href="/login" variant="primary" size="lg">
               Get Started Free
             </CTAButton>
             <CTAButton href="/features" variant="outline" size="lg">
@@ -308,7 +308,7 @@ export default function LandingPage() {
           <p className="text-lg text-muted-foreground mb-8">
             Get started for free. No credit card required.
           </p>
-          <CTAButton href="/dashboard" variant="secondary" size="lg">
+          <CTAButton href="/login" variant="secondary" size="lg">
             Get Started Free
             <ArrowRight className="w-4 h-4" />
           </CTAButton>

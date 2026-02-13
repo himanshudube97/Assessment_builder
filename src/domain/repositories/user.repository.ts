@@ -18,6 +18,11 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
 
   /**
+   * Find a user by their Google ID
+   */
+  findByGoogleId(googleId: string): Promise<User | null>;
+
+  /**
    * Create a new user
    */
   create(input: CreateUserInput): Promise<User>;
@@ -33,22 +38,12 @@ export interface IUserRepository {
   delete(id: string): Promise<void>;
 
   /**
-   * Increment the response count for the current month
-   */
-  incrementResponseCount(id: string): Promise<void>;
-
-  /**
-   * Reset response count (called monthly)
-   */
-  resetResponseCount(id: string): Promise<void>;
-
-  /**
    * Update Google Sheets token
    */
   updateGoogleSheetsToken(id: string, token: string | null): Promise<void>;
 
   /**
-   * Update Stripe customer ID
+   * Update last active organization
    */
-  updateStripeCustomerId(id: string, customerId: string): Promise<void>;
+  updateLastActiveOrg(id: string, orgId: string): Promise<void>;
 }

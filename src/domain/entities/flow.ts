@@ -46,6 +46,10 @@ export interface QuestionNodeData {
   // Multiple choice options
   options?: QuestionOption[];
 
+  // When true, single-select/yes-no questions show per-option output handles
+  // When false (default), they use a single output handle like other question types
+  enableBranching?: boolean;
+
   // Rating scale
   minValue?: number;
   maxValue?: number;

@@ -13,21 +13,18 @@ import {
   BarChart3,
   Settings,
   LayoutDashboard,
-  ChevronRight,
   Search,
-  MoreHorizontal,
-  ExternalLink,
-  Copy,
   Pencil,
   Sparkles,
   Zap,
   Clock,
-  TrendingUp,
   Users,
-  ArrowUpRight,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Assessment } from '@/domain/entities/assessment';
+import type { SessionInfo } from '@/domain/entities/auth';
+import { useAuthStore, useSession, useIsLoading as useAuthLoading } from '@/presentation/stores/auth.store';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -37,10 +34,32 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const session = useSession();
+  const authLoading = useAuthLoading();
+  const fetchSession = useAuthStore((state) => state.fetchSession);
+  const logout = useAuthStore((state) => state.logout);
+
+  // Fetch session on mount
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !session) {
+      router.push('/login');
+    }
+  }, [authLoading, session, router]);
+
   useEffect(() => {
     async function loadAssessments() {
       try {
         const response = await fetch('/api/assessments');
+        if (response.status === 401) {
+          // Not authenticated, redirect to login
+          router.push('/login');
+          return;
+        }
         if (response.ok) {
           const data = await response.json();
           setAssessments(data);
@@ -51,8 +70,12 @@ export default function DashboardPage() {
         setIsLoading(false);
       }
     }
-    loadAssessments();
-  }, []);
+
+    // Only load assessments when authenticated
+    if (session) {
+      loadAssessments();
+    }
+  }, [session, router]);
 
   const handleCreateAssessment = async () => {
     try {
@@ -62,9 +85,16 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Untitled Assessment' }),
       });
+      if (response.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (response.ok) {
         const assessment = await response.json();
         router.push(`/dashboard/${assessment.id}/edit`);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to create assessment');
       }
     } catch (error) {
       console.error('Error creating assessment:', error);
@@ -72,6 +102,20 @@ export default function DashboardPage() {
       setIsCreating(false);
     }
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!session) {
+    return null;
+  }
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -124,7 +168,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
       {/* Sidebar */}
-      <Sidebar stats={stats} />
+      <Sidebar stats={stats} session={session} onLogout={logout} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -167,9 +211,17 @@ export default function DashboardPage() {
             </motion.button>
 
             {/* User Avatar */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-sm font-medium">
-              U
-            </div>
+            {session.user.avatarUrl ? (
+              <img
+                src={session.user.avatarUrl}
+                alt={session.user.name}
+                className="w-8 h-8 rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-sm font-medium">
+                {session.user.name.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </header>
 
@@ -249,6 +301,7 @@ export default function DashboardPage() {
                             onToggleSelect={() => toggleSelect(assessment.id)}
                             onDelete={handleDelete}
                             onClick={() => router.push(`/dashboard/${assessment.id}/edit`)}
+                            onAnalytics={(id) => router.push(`/dashboard/${id}/analytics`)}
                           />
                         ))}
                       </AnimatePresence>
@@ -271,13 +324,28 @@ export default function DashboardPage() {
 }
 
 // Sidebar Component
-function Sidebar({ stats }: { stats: { total: number; published: number; totalResponses: number } }) {
+function Sidebar({
+  stats,
+  session,
+  onLogout,
+}: {
+  stats: { total: number; published: number; totalResponses: number };
+  session: SessionInfo;
+  onLogout: () => void;
+}) {
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', active: true },
     { icon: FileText, label: 'Assessments', href: '/dashboard', badge: stats.total },
     { icon: BarChart3, label: 'Responses', href: '/dashboard/responses', badge: stats.totalResponses },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
   ];
+
+  const userInitials = session.user.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <aside className="w-64 bg-slate-900 dark:bg-slate-950 flex flex-col flex-shrink-0">
@@ -289,6 +357,12 @@ function Sidebar({ stats }: { stats: { total: number; published: number; totalRe
           </div>
           <span className="text-lg font-semibold text-white">FlowForm</span>
         </Link>
+      </div>
+
+      {/* Organization */}
+      <div className="px-4 py-3 border-b border-slate-800">
+        <p className="text-xs text-slate-500 uppercase mb-1">Organization</p>
+        <p className="text-sm font-medium text-white truncate">{session.organization.name}</p>
       </div>
 
       {/* Navigation */}
@@ -321,32 +395,48 @@ function Sidebar({ stats }: { stats: { total: number; published: number; totalRe
       </nav>
 
       {/* Upgrade Card */}
-      <div className="p-4">
-        <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className="h-5 w-5" />
-            <span className="font-semibold">Upgrade to Pro</span>
+      {session.organization.plan === 'free' && (
+        <div className="p-4">
+          <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-5 w-5" />
+              <span className="font-semibold">Upgrade to Pro</span>
+            </div>
+            <p className="text-sm text-indigo-100 mb-3">
+              Unlock unlimited forms and advanced features
+            </p>
+            <button className="w-full py-2 bg-white text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors">
+              Upgrade Now
+            </button>
           </div>
-          <p className="text-sm text-indigo-100 mb-3">
-            Unlock unlimited forms and advanced features
-          </p>
-          <button className="w-full py-2 bg-white text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors">
-            Upgrade Now
-          </button>
         </div>
-      </div>
+      )}
 
       {/* User */}
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-medium">
-            U
-          </div>
+          {session.user.avatarUrl ? (
+            <img
+              src={session.user.avatarUrl}
+              alt={session.user.name}
+              className="w-9 h-9 rounded-full"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-medium">
+              {userInitials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">User</p>
-            <p className="text-xs text-slate-400 truncate">Free Plan</p>
+            <p className="text-sm font-medium text-white truncate">{session.user.name}</p>
+            <p className="text-xs text-slate-400 truncate capitalize">{session.organization.plan} Plan</p>
           </div>
-          <Settings className="h-4 w-4 text-slate-400 hover:text-white cursor-pointer" />
+          <button
+            onClick={onLogout}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>
@@ -361,6 +451,7 @@ function TableRow({
   onToggleSelect,
   onDelete,
   onClick,
+  onAnalytics,
 }: {
   assessment: Assessment;
   index: number;
@@ -368,6 +459,7 @@ function TableRow({
   onToggleSelect: () => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onClick: () => void;
+  onAnalytics: (id: string) => void;
 }) {
   const [showActions, setShowActions] = useState(false);
 
@@ -476,6 +568,15 @@ function TableRow({
           >
             <Pencil className="h-4 w-4" />
           </button>
+          {(assessment.responseCount || 0) > 0 && (
+            <button
+              onClick={() => onAnalytics(assessment.id)}
+              className="p-2 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
+              title="Analytics"
+            >
+              <BarChart3 className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={(e) => onDelete(assessment.id, e)}
             className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"

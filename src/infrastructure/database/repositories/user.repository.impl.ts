@@ -18,11 +18,8 @@ function mapToDomain(record: typeof users.$inferSelect): User {
     email: record.email,
     name: record.name,
     avatarUrl: record.avatarUrl,
-    plan: record.plan,
-    planExpiresAt: record.planExpiresAt,
-    responseCountThisMonth: record.responseCountThisMonth,
-    responseCountResetAt: record.responseCountResetAt,
-    stripeCustomerId: record.stripeCustomerId,
+    googleId: record.googleId,
+    lastActiveOrgId: record.lastActiveOrgId,
     googleSheetsToken: record.googleSheetsToken,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -52,6 +49,16 @@ export class UserRepository implements IUserRepository {
     return result[0] ? mapToDomain(result[0]) : null;
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    const result = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
+      .limit(1);
+
+    return result[0] ? mapToDomain(result[0]) : null;
+  }
+
   async create(input: CreateUserInput): Promise<User> {
     const result = await this.db
       .insert(users)
@@ -59,7 +66,7 @@ export class UserRepository implements IUserRepository {
         email: input.email.toLowerCase(),
         name: input.name,
         avatarUrl: input.avatarUrl ?? null,
-        responseCountResetAt: new Date(),
+        googleId: input.googleId ?? null,
       })
       .returning();
 
@@ -73,11 +80,8 @@ export class UserRepository implements IUserRepository {
 
     if (input.name !== undefined) updateData.name = input.name;
     if (input.avatarUrl !== undefined) updateData.avatarUrl = input.avatarUrl;
-    if (input.plan !== undefined) updateData.plan = input.plan;
-    if (input.planExpiresAt !== undefined)
-      updateData.planExpiresAt = input.planExpiresAt;
-    if (input.stripeCustomerId !== undefined)
-      updateData.stripeCustomerId = input.stripeCustomerId;
+    if (input.googleId !== undefined) updateData.googleId = input.googleId;
+    if (input.lastActiveOrgId !== undefined) updateData.lastActiveOrgId = input.lastActiveOrgId;
     if (input.googleSheetsToken !== undefined)
       updateData.googleSheetsToken = input.googleSheetsToken;
 
@@ -98,50 +102,6 @@ export class UserRepository implements IUserRepository {
     await this.db.delete(users).where(eq(users.id, id));
   }
 
-  async incrementResponseCount(id: string): Promise<void> {
-    const user = await this.findById(id);
-    if (!user) {
-      throw new Error(`User not found: ${id}`);
-    }
-
-    // Check if we need to reset the counter (new month)
-    const now = new Date();
-    const resetAt = new Date(user.responseCountResetAt);
-    const isNewMonth =
-      now.getMonth() !== resetAt.getMonth() ||
-      now.getFullYear() !== resetAt.getFullYear();
-
-    if (isNewMonth) {
-      await this.db
-        .update(users)
-        .set({
-          responseCountThisMonth: 1,
-          responseCountResetAt: now,
-          updatedAt: now,
-        })
-        .where(eq(users.id, id));
-    } else {
-      await this.db
-        .update(users)
-        .set({
-          responseCountThisMonth: user.responseCountThisMonth + 1,
-          updatedAt: now,
-        })
-        .where(eq(users.id, id));
-    }
-  }
-
-  async resetResponseCount(id: string): Promise<void> {
-    await this.db
-      .update(users)
-      .set({
-        responseCountThisMonth: 0,
-        responseCountResetAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id));
-  }
-
   async updateGoogleSheetsToken(id: string, token: string | null): Promise<void> {
     await this.db
       .update(users)
@@ -152,11 +112,11 @@ export class UserRepository implements IUserRepository {
       .where(eq(users.id, id));
   }
 
-  async updateStripeCustomerId(id: string, customerId: string): Promise<void> {
+  async updateLastActiveOrg(id: string, orgId: string): Promise<void> {
     await this.db
       .update(users)
       .set({
-        stripeCustomerId: customerId,
+        lastActiveOrgId: orgId,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id));

@@ -25,14 +25,14 @@ export interface IAssessmentRepository {
   findById(id: string): Promise<Assessment | null>;
 
   /**
-   * Find all assessments for a user
+   * Find all assessments for an organization
    */
-  findByUserId(userId: string, options?: AssessmentListOptions): Promise<Assessment[]>;
+  findByOrganizationId(organizationId: string, options?: AssessmentListOptions): Promise<Assessment[]>;
 
   /**
-   * Count assessments for a user
+   * Count assessments for an organization
    */
-  countByUserId(userId: string): Promise<number>;
+  countByOrganizationId(organizationId: string): Promise<number>;
 
   /**
    * Find a published assessment (for public access)
@@ -63,6 +63,11 @@ export interface IAssessmentRepository {
    * Unpublish an assessment
    */
   unpublish(id: string): Promise<Assessment>;
+
+  /**
+   * Close an assessment (stops accepting responses)
+   */
+  close(id: string): Promise<Assessment>;
 
   /**
    * Duplicate an assessment

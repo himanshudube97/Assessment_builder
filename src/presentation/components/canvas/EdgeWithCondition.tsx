@@ -15,7 +15,7 @@ import {
   type EdgeProps,
 } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Plus } from 'lucide-react';
+import { X, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EdgeCondition, ConditionType, MatchMode } from '@/domain/entities/flow';
 
@@ -125,7 +125,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
           onMouseLeave={() => setIsHovered(false)}
         >
           <AnimatePresence mode="wait">
-            {hasCondition ? (
+            {hasCondition && (
               <motion.div
                 key="condition"
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -145,25 +145,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                   {formatCondition(data.condition!)}
                 </span>
               </motion.div>
-            ) : (selected || isHovered) ? (
-              <motion.button
-                key="add"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                onClick={() => setIsEditing(true)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
-                  'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300',
-                  'border-2 border-slate-200 dark:border-slate-600',
-                  'hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400',
-                  'shadow-sm hover:shadow-md transition-all'
-                )}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add logic</span>
-              </motion.button>
-            ) : null}
+            )}
           </AnimatePresence>
 
           {/* Condition Editor Modal */}

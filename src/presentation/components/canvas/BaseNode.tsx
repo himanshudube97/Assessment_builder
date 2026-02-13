@@ -21,7 +21,6 @@ interface BaseNodeProps {
   children: ReactNode;
   showSourceHandle?: boolean;
   showTargetHandle?: boolean;
-  customSourceHandles?: ReactNode;
   headerColor?: string;
   borderColor?: string;
 }
@@ -49,12 +48,14 @@ export const BaseNode = memo(function BaseNode({
   children,
   showSourceHandle = true,
   showTargetHandle = true,
-  customSourceHandles,
   headerColor,
   borderColor,
 }: BaseNodeProps) {
   const selectNode = useCanvasStore((s) => s.selectNode);
   const deleteNode = useCanvasStore((s) => s.deleteNode);
+  const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
+
+  const isNewlyAdded = id === newlyAddedNodeId;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,15 +69,16 @@ export const BaseNode = memo(function BaseNode({
 
   return (
     <motion.div
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.8, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
       className={cn(
-        'w-[280px] rounded-xl border-2 bg-card shadow-md transition-all duration-200',
+        'relative w-[280px] rounded-xl border-2 bg-card shadow-md transition-all duration-200 overflow-visible',
         'hover:shadow-xl cursor-grab active:cursor-grabbing',
         borderColor || nodeBorderColors[type],
-        selected && 'ring-2 ring-ring ring-offset-2 ring-offset-background shadow-xl'
+        selected && 'ring-2 ring-ring ring-offset-2 ring-offset-background shadow-xl',
+        // Glow effect for newly added node
+        isNewlyAdded && 'ring-4 ring-primary/50 shadow-[0_0_30px_rgba(99,102,241,0.4)]'
       )}
       onClick={handleClick}
     >
@@ -110,8 +112,8 @@ export const BaseNode = memo(function BaseNode({
         )}
       </div>
 
-      {/* Body */}
-      <div className="p-4">{children}</div>
+      {/* Body - overflow-visible allows handles to extend outside */}
+      <div className="p-4 overflow-visible">{children}</div>
 
       {/* Target Handle - Improved */}
       {showTargetHandle && (
@@ -128,7 +130,7 @@ export const BaseNode = memo(function BaseNode({
       )}
 
       {/* Source Handle - Improved */}
-      {showSourceHandle && !customSourceHandles && (
+      {showSourceHandle && (
         <Handle
           type="source"
           position={Position.Bottom}
@@ -140,8 +142,6 @@ export const BaseNode = memo(function BaseNode({
           )}
         />
       )}
-
-      {customSourceHandles}
     </motion.div>
   );
 });

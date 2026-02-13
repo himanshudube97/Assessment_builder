@@ -1,21 +1,20 @@
 /**
  * Assessments API Route
- * GET /api/assessments - List assessments
- * POST /api/assessments - Create assessment
+ * GET /api/assessments - List assessments for current organization
+ * POST /api/assessments - Create assessment in current organization
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAssessmentRepository } from '@/infrastructure/database/repositories';
+import { requireAuth } from '@/infrastructure/auth';
+import { getAssessmentRepository, getOrganizationRepository } from '@/infrastructure/database/repositories';
+import { canOrgCreateAssessment } from '@/domain/entities/organization';
 
-// System user ID for development
-const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000001';
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
+    const user = await requireAuth();
     const repo = getAssessmentRepository();
 
-    // For now, get all assessments for system user
-    const assessments = await repo.findByUserId(SYSTEM_USER_ID, {
+    const assessments = await repo.findByOrganizationId(user.currentOrgId, {
       orderBy: 'updatedAt',
       orderDirection: 'desc',
     });
@@ -23,6 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(assessments);
   } catch (error) {
     console.error('Error fetching assessments:', error);
+    if (error instanceof Error && 'statusCode' in error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: (error as { statusCode: number }).statusCode }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to fetch assessments' },
       { status: 500 }
@@ -32,11 +37,32 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
     const body = await request.json();
-    const repo = getAssessmentRepository();
 
-    const assessment = await repo.create({
-      userId: SYSTEM_USER_ID,
+    const assessmentRepo = getAssessmentRepository();
+    const orgRepo = getOrganizationRepository();
+
+    // Check if org can create more assessments
+    const org = await orgRepo.findById(user.currentOrgId);
+    if (!org) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
+        { status: 404 }
+      );
+    }
+
+    const currentCount = await assessmentRepo.countByOrganizationId(user.currentOrgId);
+    if (!canOrgCreateAssessment(org, currentCount)) {
+      return NextResponse.json(
+        { error: 'Assessment limit reached. Upgrade your plan to create more assessments.' },
+        { status: 403 }
+      );
+    }
+
+    const assessment = await assessmentRepo.create({
+      organizationId: user.currentOrgId,
+      createdBy: user.id,
       title: body.title || 'Untitled Assessment',
       description: body.description || null,
     });
@@ -44,6 +70,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(assessment, { status: 201 });
   } catch (error) {
     console.error('Error creating assessment:', error);
+    if (error instanceof Error && 'statusCode' in error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: (error as { statusCode: number }).statusCode }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to create assessment' },
       { status: 500 }

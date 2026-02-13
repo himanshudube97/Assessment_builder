@@ -57,13 +57,13 @@ export function Navbar() {
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              href="/dashboard"
+              href="/login"
               className="text-muted-foreground hover:text-foreground transition-colors font-medium"
             >
               Login
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-foreground text-background font-medium hover:bg-foreground/90 transition-colors"
             >
               Get Started
@@ -101,14 +101,14 @@ export function Navbar() {
               ))}
               <hr className="border-border" />
               <Link
-                href="/dashboard"
+                href="/login"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors font-medium py-2"
               >
                 Login
               </Link>
               <Link
-                href="/dashboard"
+                href="/login"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-foreground text-background font-medium hover:bg-foreground/90 transition-colors"
               >

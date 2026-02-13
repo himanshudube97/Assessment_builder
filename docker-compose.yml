@@ -16,7 +16,6 @@ services:
       - "5768:5432"
     volumes:
       - flowform_postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U flowform -d flowform"]
       interval: 5s

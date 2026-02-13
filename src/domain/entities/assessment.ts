@@ -23,7 +23,8 @@ export interface AssessmentSettings {
 
 export interface Assessment {
   id: string;
-  userId: string;
+  organizationId: string;
+  createdBy: string | null;
   title: string;
   description: string | null;
   status: AssessmentStatus;
@@ -49,7 +50,8 @@ export interface Assessment {
 }
 
 export interface CreateAssessmentInput {
-  userId: string;
+  organizationId: string;
+  createdBy?: string | null;
   title: string;
   description?: string | null;
 }

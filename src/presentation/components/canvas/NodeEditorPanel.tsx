@@ -21,6 +21,7 @@ import {
   Star,
   ToggleLeft,
   Sparkles,
+  GitBranch,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, useSelectedNode } from '@/presentation/stores/canvas.store';
@@ -278,6 +279,8 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
   data,
 }: QuestionNodeEditorProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const toggleBranching = useCanvasStore((s) => s.toggleBranching);
+  const canDisableBranching = useCanvasStore((s) => s.canDisableBranching);
   const config = questionTypeConfig[data.questionType];
 
   const addOption = useCallback(() => {
@@ -522,6 +525,48 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
           />
         </div>
       )}
+
+      {/* Option branching toggle - only for multiple choice single */}
+      {data.questionType === 'multiple_choice_single' && (() => {
+        const canToggleOff = !data.enableBranching || canDisableBranching(nodeId);
+        return (
+          <div className={cn(
+            'flex items-center justify-between p-3 rounded-xl',
+            'bg-gradient-to-r from-indigo-500/5 to-indigo-500/10',
+            'border border-indigo-200 dark:border-indigo-800'
+          )}>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4 text-indigo-500" />
+                <label className="text-sm font-medium text-foreground">Option Branching</label>
+              </div>
+              <p className="text-xs text-muted-foreground pl-6">
+                {data.enableBranching && !canToggleOff
+                  ? 'Remove extra branches to disable'
+                  : 'Route to different paths per option'}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (data.enableBranching && !canToggleOff) return;
+                toggleBranching(nodeId, !data.enableBranching);
+              }}
+              disabled={data.enableBranching && !canToggleOff}
+              className={cn(
+                'relative w-12 h-7 rounded-full transition-colors flex-shrink-0',
+                data.enableBranching ? 'bg-indigo-500' : 'bg-muted',
+                data.enableBranching && !canToggleOff && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <motion.div
+                animate={{ x: data.enableBranching ? 22 : 3 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-md"
+              />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Divider */}
       <div className="border-t border-border" />

@@ -15,15 +15,13 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid, Sparkles } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutGrid } from 'lucide-react';
 
 import { useCanvasStore } from '@/presentation/stores/canvas.store';
 import { StartNode } from './StartNode';
 import { QuestionNode } from './QuestionNode';
 import { EndNode } from './EndNode';
 import { EdgeWithCondition } from './EdgeWithCondition';
-import { cn } from '@/lib/utils';
 import type { QuestionType, EdgeCondition } from '@/domain/entities/flow';
 
 // Custom node types
@@ -48,7 +46,7 @@ interface FlowCanvasProps {
 
 function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { project, setCenter, getNode } = useReactFlow();
+  const { project } = useReactFlow();
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -61,27 +59,15 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
 
-  // Center view on newly added node
+  // Auto-dismiss node highlight after a short delay
   useEffect(() => {
     if (newlyAddedNodeId) {
-      const node = getNode(newlyAddedNodeId);
-      if (node) {
-        // Center the view on the new node with animation
-        setTimeout(() => {
-          setCenter(
-            node.position.x + 140, // Center of node (280/2)
-            node.position.y + 90,  // Center of node (180/2)
-            { zoom: 1, duration: 300 }
-          );
-        }, 50);
-      }
+      const timer = setTimeout(() => {
+        clearNewlyAddedNode();
+      }, 2000); // Auto-dismiss after 2 seconds
+      return () => clearTimeout(timer);
     }
-  }, [newlyAddedNodeId, getNode, setCenter]);
-
-  // Handle clicking to dismiss spotlight
-  const handleSpotlightDismiss = useCallback(() => {
-    clearNewlyAddedNode();
-  }, [clearNewlyAddedNode]);
+  }, [newlyAddedNodeId, clearNewlyAddedNode]);
 
   // Add condition change handler to edges
   const edgesWithHandlers = useMemo(() => {
@@ -249,38 +235,6 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
         </Panel>
       </ReactFlow>
 
-      {/* Spotlight Overlay for newly added nodes */}
-      <AnimatePresence>
-        {newlyAddedNodeId && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-10 pointer-events-auto"
-            onClick={handleSpotlightDismiss}
-          >
-            {/* Blur overlay */}
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" />
-
-            {/* Floating hint */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className={cn(
-                'absolute bottom-8 left-1/2 -translate-x-1/2',
-                'flex items-center gap-2 px-4 py-2 rounded-full',
-                'bg-primary text-primary-foreground shadow-lg',
-                'text-sm font-medium'
-              )}
-            >
-              <Sparkles className="h-4 w-4" />
-              Node added! Click anywhere to continue
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   Cloud,
   CloudOff,
   Pencil,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore } from '@/presentation/stores/canvas.store';
@@ -26,6 +27,7 @@ import {
   NodeEditorPanel,
 } from '@/presentation/components/canvas';
 import { PreviewModal } from '@/presentation/components/preview';
+import { PublishModal } from '@/presentation/components/publish';
 import type { QuestionType } from '@/domain/entities/flow';
 
 // Debounce helper
@@ -52,12 +54,16 @@ export default function EditorPage({ params }: EditorPageProps) {
   const {
     title,
     description,
+    status,
+    publishedAt,
+    closeAt,
     nodes,
     edges,
     isDirty,
     isSaving,
     lastSavedAt,
     setAssessment,
+    setStatus,
     updateTitle,
     updateDescription,
     loadCanvas,
@@ -73,6 +79,7 @@ export default function EditorPage({ params }: EditorPageProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editableTitle, setEditableTitle] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   // Debounced dirty state for auto-save
   const debouncedIsDirty = useDebounce(isDirty, 2000);
@@ -90,7 +97,14 @@ export default function EditorPage({ params }: EditorPageProps) {
         }
 
         const assessment = await response.json();
-        setAssessment(assessment.id, assessment.title, assessment.description);
+        setAssessment(
+          assessment.id,
+          assessment.title,
+          assessment.description,
+          assessment.status,
+          assessment.publishedAt,
+          assessment.settings?.closeAt
+        );
         loadCanvas(assessment.nodes, assessment.edges);
         setEditableTitle(assessment.title);
       } catch (err) {
@@ -142,6 +156,45 @@ export default function EditorPage({ params }: EditorPageProps) {
     }
   }, [id, title, description, isSaving, setSaving, getFlowData, markSaved]);
 
+  // Publish assessment
+  const handlePublish = useCallback(async (closeAtDate?: Date) => {
+    try {
+      const response = await fetch(`/api/assessments/${id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ closeAt: closeAtDate?.toISOString() }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to publish');
+      }
+
+      const published = await response.json();
+      setStatus('published', published.publishedAt);
+    } catch (err) {
+      console.error('Error publishing:', err);
+      throw err;
+    }
+  }, [id, setStatus]);
+
+  // Close assessment
+  const handleCloseAssessment = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/assessments/${id}/close`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to close');
+      }
+
+      setStatus('closed');
+    } catch (err) {
+      console.error('Error closing:', err);
+      throw err;
+    }
+  }, [id, setStatus]);
+
   // Handle title edit
   const handleTitleSubmit = useCallback(() => {
     if (editableTitle.trim() && editableTitle !== title) {
@@ -152,6 +205,71 @@ export default function EditorPage({ params }: EditorPageProps) {
     setIsEditingTitle(false);
   }, [editableTitle, title, updateTitle]);
 
+  // Get selected node from store
+  const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
+
+  // Calculate smart position for new nodes
+  const calculateSmartPosition = useCallback(() => {
+    const NODE_WIDTH = 280;
+    const NODE_HEIGHT = 180;
+    const SPACING_Y = 60;
+
+    // Helper to check if position overlaps with any existing node
+    const hasOverlap = (x: number, y: number) => {
+      return nodes.some((n) => {
+        const dx = Math.abs(n.position.x - x);
+        const dy = Math.abs(n.position.y - y);
+        return dx < NODE_WIDTH + 20 && dy < NODE_HEIGHT + 20;
+      });
+    };
+
+    // Helper to find non-overlapping position
+    const findNonOverlappingPosition = (baseX: number, baseY: number) => {
+      let x = baseX;
+      let y = baseY;
+      let attempts = 0;
+
+      while (hasOverlap(x, y) && attempts < 10) {
+        y += NODE_HEIGHT + SPACING_Y;
+        attempts++;
+      }
+      return { x, y };
+    };
+
+    // If a node is selected, place below it
+    if (selectedNodeId) {
+      const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+      if (selectedNode) {
+        return findNonOverlappingPosition(
+          selectedNode.position.x,
+          selectedNode.position.y + NODE_HEIGHT + SPACING_Y
+        );
+      }
+    }
+
+    // No selection - calculate center of existing nodes and place below
+    if (nodes.length > 0) {
+      // Calculate bounding box
+      let minX = Infinity, maxX = -Infinity;
+      let maxY = -Infinity;
+
+      nodes.forEach((n) => {
+        minX = Math.min(minX, n.position.x);
+        maxX = Math.max(maxX, n.position.x + NODE_WIDTH);
+        maxY = Math.max(maxY, n.position.y + NODE_HEIGHT);
+      });
+
+      // Place at horizontal center, below all nodes
+      const centerX = minX + (maxX - minX) / 2 - NODE_WIDTH / 2;
+      const newY = maxY + SPACING_Y;
+
+      return findNonOverlappingPosition(centerX, newY);
+    }
+
+    // No nodes exist - place at a default starting position
+    return { x: 300, y: 200 };
+  }, [nodes, selectedNodeId]);
+
   // Handle adding nodes from sidebar
   const handleAddNode = useCallback(
     (
@@ -159,10 +277,8 @@ export default function EditorPage({ params }: EditorPageProps) {
       position?: { x: number; y: number },
       questionType?: QuestionType
     ) => {
-      const pos = position || {
-        x: 250 + Math.random() * 100,
-        y: 200 + nodes.length * 150,
-      };
+      // Use provided position (from drag/drop) or calculate smart position
+      const pos = position || calculateSmartPosition();
 
       if (type === 'question' && questionType) {
         addQuestionNode(questionType, pos);
@@ -170,7 +286,7 @@ export default function EditorPage({ params }: EditorPageProps) {
         addNode(type, pos);
       }
     },
-    [nodes.length, addQuestionNode, addNode]
+    [calculateSmartPosition, addQuestionNode, addNode]
   );
 
   // Handle keyboard shortcuts
@@ -344,12 +460,28 @@ export default function EditorPage({ params }: EditorPageProps) {
             onClick={() => setIsPreviewOpen(true)}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
-              'bg-primary text-primary-foreground',
-              'hover:bg-primary/90'
+              'bg-muted text-muted-foreground',
+              'hover:bg-muted/80'
             )}
           >
             <Eye className="h-4 w-4" />
             <span className="text-sm font-medium">Preview</span>
+          </button>
+
+          {/* Publish button */}
+          <button
+            onClick={() => setIsPublishModalOpen(true)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
+              status === 'published'
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            )}
+          >
+            <Globe className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              {status === 'published' ? 'Published' : status === 'closed' ? 'Closed' : 'Publish'}
+            </span>
           </button>
         </div>
       </header>
@@ -379,6 +511,19 @@ export default function EditorPage({ params }: EditorPageProps) {
         nodes={flowData.nodes}
         edges={flowData.edges}
         title={title}
+      />
+
+      {/* Publish Modal */}
+      <PublishModal
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        assessmentId={id}
+        title={title}
+        status={status}
+        publishedAt={publishedAt}
+        closeAt={closeAt}
+        onPublish={handlePublish}
+        onCloseAssessment={handleCloseAssessment}
       />
     </div>
   );

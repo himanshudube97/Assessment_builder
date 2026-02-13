@@ -54,4 +54,12 @@ export interface IResponseRepository {
     averageScore: number | null;
     completionRate: number;
   }>;
+
+  /**
+   * Get answer distribution for analytics
+   * Returns count of each answer value per question
+   */
+  getAnswerDistribution(
+    assessmentId: string
+  ): Promise<Record<string, Record<string, number>>>;
 }

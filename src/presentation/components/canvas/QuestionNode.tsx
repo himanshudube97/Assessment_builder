@@ -59,47 +59,12 @@ export const QuestionNode = memo(function QuestionNode({
   const typeLabel = questionTypeLabels[data.questionType] || 'Question';
   const colors = questionTypeColors[data.questionType] || { header: 'bg-indigo-500', border: 'border-indigo-300 dark:border-indigo-700' };
 
-  // Check if this question type supports per-option branching
+  // Yes/No always has per-option branching (2 dots: Yes and No)
+  // Multiple choice single has optional branching via toggle
   const hasOptionBranching =
-    data.questionType === 'multiple_choice_single' ||
-    data.questionType === 'yes_no';
+    data.questionType === 'yes_no' ||
+    (data.questionType === 'multiple_choice_single' && data.enableBranching === true);
 
-  // Generate custom source handles for each option (for single-select questions)
-  // These handles allow branching based on the selected option
-  const customSourceHandles = hasOptionBranching && data.options ? (
-    <div className="absolute right-0 top-0 h-full">
-      {data.options.slice(0, 4).map((option, index) => {
-        // Calculate vertical position to align with options in the node body
-        // Header is ~52px, question text takes ~24px, then options start
-        const baseOffset = 100; // Start position for first option
-        const spacing = 28; // Space between options
-        const topPosition = baseOffset + (index * spacing);
-
-        return (
-          <div
-            key={option.id}
-            className="absolute flex items-center"
-            style={{ top: `${topPosition}px`, right: '-8px' }}
-          >
-            {/* Handle with tooltip-style label */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={option.id}
-              className={cn(
-                '!relative !transform-none !right-0 !top-0',
-                '!w-4 !h-4 !border-[3px] !border-background !rounded-full',
-                '!transition-all !duration-200',
-                '!bg-indigo-400 hover:!bg-indigo-600 hover:!scale-125',
-                'hover:!shadow-lg'
-              )}
-              title={`Connect "${option.text}" to next step`}
-            />
-          </div>
-        );
-      })}
-    </div>
-  ) : null;
 
   return (
     <BaseNode
@@ -109,11 +74,10 @@ export const QuestionNode = memo(function QuestionNode({
       title={typeLabel}
       icon={icon}
       showSourceHandle={!hasOptionBranching}
-      customSourceHandles={customSourceHandles}
       headerColor={colors.header}
       borderColor={colors.border}
     >
-      <div className="space-y-3">
+      <div className={cn('space-y-3', hasOptionBranching && 'overflow-visible')}>
         {/* Question text */}
         <p
           className={cn(
@@ -129,14 +93,11 @@ export const QuestionNode = memo(function QuestionNode({
           data.questionType === 'multiple_choice_multi' ||
           data.questionType === 'yes_no') &&
           data.options && (
-            <div className="space-y-1.5">
-              {data.options.slice(0, 4).map((option, index) => (
+            <div className={cn('space-y-1.5', hasOptionBranching && 'overflow-visible')}>
+              {data.options.slice(0, 4).map((option) => (
                 <div
                   key={option.id}
-                  className={cn(
-                    'flex items-center gap-2 text-sm',
-                    hasOptionBranching ? 'pr-6' : '' // More padding for handle
-                  )}
+                  className="flex items-center gap-2 text-sm relative"
                 >
                   {/* Radio/Checkbox indicator */}
                   {data.questionType === 'multiple_choice_single' ||
@@ -149,11 +110,19 @@ export const QuestionNode = memo(function QuestionNode({
                   {/* Option text */}
                   <span className="truncate flex-1 text-muted-foreground">{option.text}</span>
 
-                  {/* Visual connector to handle for branching options */}
+                  {/* Per-option handle - inside the option row */}
                   {hasOptionBranching && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-6 h-[2px] bg-gradient-to-r from-transparent to-indigo-300 dark:to-indigo-600" />
-                      <div className="w-2 h-2 rounded-full bg-indigo-400 border-2 border-background" />
+                    <div className="absolute -right-[22px] top-1/2 -translate-y-1/2">
+                      <Handle
+                        type="source"
+                        position={Position.Right}
+                        id={option.id}
+                        className={cn(
+                          '!relative !transform-none !inset-auto',
+                          '!w-3 !h-3 !bg-indigo-400 !border-2 !border-background !shadow-sm !rounded-full',
+                          'hover:!w-4 hover:!h-4 !transition-all !duration-200'
+                        )}
+                      />
                     </div>
                   )}
                 </div>

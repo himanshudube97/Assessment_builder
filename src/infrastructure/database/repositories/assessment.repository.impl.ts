@@ -29,7 +29,8 @@ import type { FlowNode, FlowEdge } from '@/domain/entities/flow';
 function mapToDomain(record: typeof assessments.$inferSelect): Assessment {
   return {
     id: record.id,
-    userId: record.userId,
+    organizationId: record.organizationId,
+    createdBy: record.createdBy,
     title: record.title,
     description: record.description,
     status: record.status,
@@ -61,8 +62,8 @@ export class AssessmentRepository implements IAssessmentRepository {
     return result[0] ? mapToDomain(result[0]) : null;
   }
 
-  async findByUserId(
-    userId: string,
+  async findByOrganizationId(
+    organizationId: string,
     options: AssessmentListOptions = {}
   ): Promise<Assessment[]> {
     const {
@@ -73,7 +74,7 @@ export class AssessmentRepository implements IAssessmentRepository {
       orderDirection = 'desc',
     } = options;
 
-    const conditions = [eq(assessments.userId, userId)];
+    const conditions = [eq(assessments.organizationId, organizationId)];
     if (status) {
       conditions.push(eq(assessments.status, status));
     }
@@ -98,11 +99,11 @@ export class AssessmentRepository implements IAssessmentRepository {
     return result.map(mapToDomain);
   }
 
-  async countByUserId(userId: string): Promise<number> {
+  async countByOrganizationId(organizationId: string): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(assessments)
-      .where(eq(assessments.userId, userId));
+      .where(eq(assessments.organizationId, organizationId));
 
     return result[0]?.count ?? 0;
   }
@@ -121,7 +122,8 @@ export class AssessmentRepository implements IAssessmentRepository {
     const result = await this.db
       .insert(assessments)
       .values({
-        userId: input.userId,
+        organizationId: input.organizationId,
+        createdBy: input.createdBy ?? null,
         title: input.title,
         description: input.description ?? null,
         nodes: createDefaultNodes(),
@@ -204,6 +206,23 @@ export class AssessmentRepository implements IAssessmentRepository {
     return mapToDomain(result[0]);
   }
 
+  async close(id: string): Promise<Assessment> {
+    const result = await this.db
+      .update(assessments)
+      .set({
+        status: 'closed',
+        updatedAt: new Date(),
+      })
+      .where(eq(assessments.id, id))
+      .returning();
+
+    if (!result[0]) {
+      throw new Error(`Assessment not found: ${id}`);
+    }
+
+    return mapToDomain(result[0]);
+  }
+
   async duplicate(id: string, newTitle: string): Promise<Assessment> {
     const original = await this.findById(id);
     if (!original) {
@@ -213,7 +232,8 @@ export class AssessmentRepository implements IAssessmentRepository {
     const result = await this.db
       .insert(assessments)
       .values({
-        userId: original.userId,
+        organizationId: original.organizationId,
+        createdBy: original.createdBy,
         title: newTitle,
         description: original.description,
         nodes: original.nodes,

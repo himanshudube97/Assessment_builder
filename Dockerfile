@@ -57,7 +57,8 @@ ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Start script that runs migrations, seeds, and starts dev server
-CMD ["sh", "-c", "npm run db:push && npm run db:seed && npm run dev"]
+# CI=true disables interactive prompts in drizzle-kit
+CMD ["sh", "-c", "CI=true npx drizzle-kit push --force && npm run db:seed && npm run dev"]
 
 # ============================================
 # Stage 4: Runner (Production)

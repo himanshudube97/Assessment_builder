@@ -145,6 +145,39 @@ export class ResponseRepository implements IResponseRepository {
       completionRate,
     };
   }
+
+  async getAnswerDistribution(
+    assessmentId: string
+  ): Promise<Record<string, Record<string, number>>> {
+    // Get all responses for this assessment
+    const allResponses = await this.findByAssessmentId(assessmentId, {
+      limit: 10000, // Get all responses
+    });
+
+    // Build distribution map: nodeId -> answerValue -> count
+    const distribution: Record<string, Record<string, number>> = {};
+
+    for (const response of allResponses) {
+      for (const answer of response.answers) {
+        if (!distribution[answer.nodeId]) {
+          distribution[answer.nodeId] = {};
+        }
+
+        // Handle array answers (multi-select)
+        const values = Array.isArray(answer.value)
+          ? answer.value
+          : [String(answer.value)];
+
+        for (const value of values) {
+          const valueStr = String(value);
+          distribution[answer.nodeId][valueStr] =
+            (distribution[answer.nodeId][valueStr] || 0) + 1;
+        }
+      }
+    }
+
+    return distribution;
+  }
 }
 
 // Singleton instance
