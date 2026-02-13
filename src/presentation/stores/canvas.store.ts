@@ -18,7 +18,7 @@ import {
   applyNodeChanges,
 } from 'reactflow';
 import type { FlowNode, FlowEdge, QuestionType, EdgeCondition, QuestionNodeData } from '@/domain/entities/flow';
-import type { AssessmentStatus } from '@/domain/entities/assessment';
+import type { AssessmentStatus, AssessmentSettings } from '@/domain/entities/assessment';
 import {
   createQuestionNode,
   createEndNode,
@@ -53,6 +53,8 @@ interface CanvasState {
   status: AssessmentStatus;
   publishedAt: Date | null;
   closeAt: Date | null;
+  responseCount: number;
+  settings: AssessmentSettings | null;
 
   // Canvas data
   nodes: RFNode[];
@@ -80,7 +82,9 @@ interface CanvasState {
     description: string | null,
     status?: AssessmentStatus,
     publishedAt?: Date | null,
-    closeAt?: Date | null
+    closeAt?: Date | null,
+    responseCount?: number,
+    settings?: AssessmentSettings | null
   ) => void;
   setStatus: (status: AssessmentStatus, publishedAt?: Date | null) => void;
   updateTitle: (title: string) => void;
@@ -188,6 +192,8 @@ const initialState = {
   status: 'draft' as AssessmentStatus,
   publishedAt: null,
   closeAt: null,
+  responseCount: 0,
+  settings: null,
   nodes: [],
   edges: [],
   edgeConditionMap: {} as Record<string, EdgeCondition | null>,
@@ -207,7 +213,7 @@ export const useCanvasStore = create<CanvasState>()(
         (set, get) => ({
           ...initialState,
 
-          setAssessment: (id, title, description, status = 'draft', publishedAt = null, closeAt = null) => {
+          setAssessment: (id, title, description, status = 'draft', publishedAt = null, closeAt = null, responseCount = 0, settings = null) => {
             set({
               assessmentId: id,
               title,
@@ -215,6 +221,8 @@ export const useCanvasStore = create<CanvasState>()(
               status,
               publishedAt: publishedAt ? new Date(publishedAt) : null,
               closeAt: closeAt ? new Date(closeAt) : null,
+              responseCount,
+              settings,
             });
           },
 

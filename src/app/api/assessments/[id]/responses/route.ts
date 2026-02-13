@@ -43,6 +43,12 @@ export async function POST(
 
     // Check if assessment is still open
     const now = new Date();
+    if (assessment.settings.openAt && now < new Date(assessment.settings.openAt)) {
+      return NextResponse.json(
+        { error: 'Assessment has not opened yet' },
+        { status: 400 }
+      );
+    }
     if (assessment.settings.closeAt && now > new Date(assessment.settings.closeAt)) {
       return NextResponse.json(
         { error: 'Assessment has closed' },

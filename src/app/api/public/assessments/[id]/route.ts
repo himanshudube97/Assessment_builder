@@ -35,6 +35,12 @@ export async function GET(
     // Check if assessment is open for responses
     const isOpen = isAssessmentOpen(assessment);
 
+    // Check if assessment is scheduled but not yet open
+    const now = new Date();
+    const isScheduled =
+      assessment.settings.openAt !== null &&
+      now < new Date(assessment.settings.openAt);
+
     // Return public data only (no userId, googleSheet info, etc.)
     return NextResponse.json({
       id: assessment.id,
@@ -51,6 +57,9 @@ export async function GET(
       status: assessment.status,
       isOpen,
       isClosed: assessment.status === 'closed' || !isOpen,
+      requiresPassword: assessment.settings.password !== null,
+      isScheduled,
+      scheduledOpenAt: isScheduled ? assessment.settings.openAt : null,
     });
   } catch (error) {
     console.error('Error fetching public assessment:', error);

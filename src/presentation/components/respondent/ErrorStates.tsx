@@ -5,8 +5,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { FileQuestion, Lock, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { FileQuestion, Lock, AlertCircle, Clock } from 'lucide-react';
 
 interface ErrorStateProps {
   title: string;
@@ -65,6 +64,31 @@ export function NotPublishedState() {
       title="Assessment Unavailable"
       description="This assessment is not currently available."
       icon={<AlertCircle className="h-10 w-10 text-slate-400" />}
+    />
+  );
+}
+
+export function ScheduledState({ openAt }: { openAt?: string | null }) {
+  const formattedDate = openAt
+    ? new Date(openAt).toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
+
+  return (
+    <ErrorStateBase
+      title="Coming Soon"
+      description={
+        formattedDate
+          ? `This assessment opens on ${formattedDate}`
+          : 'This assessment is not yet open.'
+      }
+      icon={<Clock className="h-10 w-10 text-slate-400" />}
     />
   );
 }

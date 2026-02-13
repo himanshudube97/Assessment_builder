@@ -28,6 +28,7 @@ import {
 } from '@/presentation/components/canvas';
 import { PreviewModal } from '@/presentation/components/preview';
 import { PublishModal } from '@/presentation/components/publish';
+import type { PublishSettings } from '@/presentation/components/publish/PublishModal';
 import type { QuestionType } from '@/domain/entities/flow';
 
 interface EditorPageProps {
@@ -45,6 +46,8 @@ export default function EditorPage({ params }: EditorPageProps) {
     status,
     publishedAt,
     closeAt,
+    responseCount,
+    settings,
     nodes,
     edges,
     isDirty,
@@ -88,7 +91,9 @@ export default function EditorPage({ params }: EditorPageProps) {
           assessment.description,
           assessment.status,
           assessment.publishedAt,
-          assessment.settings?.closeAt
+          assessment.settings?.closeAt,
+          assessment.responseCount ?? 0,
+          assessment.settings ?? null
         );
         loadCanvas(assessment.nodes, assessment.edges);
         canvasClearHistory(); // Don't count initial load as undoable
@@ -161,13 +166,24 @@ export default function EditorPage({ params }: EditorPageProps) {
   }, [saveAssessment]);
 
   // Publish assessment
-  const handlePublish = useCallback(async (closeAtDate?: Date) => {
+  const handlePublish = useCallback(async (publishSettings: PublishSettings) => {
     try {
       const response = await fetch(`/api/assessments/${id}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ closeAt: closeAtDate?.toISOString() }),
+        body: JSON.stringify({
+          closeAt: publishSettings.closeAt?.toISOString(),
+          openAt: publishSettings.openAt?.toISOString(),
+          maxResponses: publishSettings.maxResponses,
+          password: publishSettings.password,
+        }),
       });
+
+      // Handle validation errors
+      if (response.status === 400) {
+        const data = await response.json();
+        return { validationErrors: data.validationErrors || [] };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to publish');
@@ -175,6 +191,7 @@ export default function EditorPage({ params }: EditorPageProps) {
 
       const published = await response.json();
       setStatus('published', published.publishedAt);
+      return {};
     } catch (err) {
       console.error('Error publishing:', err);
       throw err;
@@ -548,6 +565,8 @@ export default function EditorPage({ params }: EditorPageProps) {
         status={status}
         publishedAt={publishedAt}
         closeAt={closeAt}
+        responseCount={responseCount}
+        settings={settings}
         onPublish={handlePublish}
         onCloseAssessment={handleCloseAssessment}
       />

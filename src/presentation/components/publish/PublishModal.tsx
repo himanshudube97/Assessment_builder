@@ -2,10 +2,10 @@
 
 /**
  * PublishModal Component
- * Modal for publishing assessments with share link and close options
+ * Modal for publishing assessments with settings, share link, and close options
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -17,10 +17,26 @@ import {
   Lock,
   Loader2,
   ExternalLink,
+  Users,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  AlertTriangle,
+  Clock,
+  Shield,
+  Hash,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getShareUrl, copyToClipboard } from '@/lib/share';
-import type { AssessmentStatus } from '@/domain/entities/assessment';
+import type { AssessmentStatus, AssessmentSettings } from '@/domain/entities/assessment';
+import type { FlowValidationError } from '@/domain/entities/flow';
+
+export interface PublishSettings {
+  closeAt?: Date;
+  openAt?: Date;
+  maxResponses?: number | null;
+  password?: string | null;
+}
 
 interface PublishModalProps {
   isOpen: boolean;
@@ -30,7 +46,9 @@ interface PublishModalProps {
   status: AssessmentStatus;
   publishedAt: Date | null;
   closeAt: Date | null;
-  onPublish: (closeAt?: Date) => Promise<void>;
+  responseCount: number;
+  settings: AssessmentSettings | null;
+  onPublish: (settings: PublishSettings) => Promise<{ validationErrors?: FlowValidationError[] }>;
   onCloseAssessment: () => Promise<void>;
 }
 
@@ -42,26 +60,63 @@ export function PublishModal({
   status,
   publishedAt,
   closeAt: initialCloseAt,
+  responseCount,
+  settings,
   onPublish,
   onCloseAssessment,
 }: PublishModalProps) {
-  const [closeAt, setCloseAt] = useState<string>(
-    initialCloseAt ? new Date(initialCloseAt).toISOString().slice(0, 16) : ''
-  );
+  // Form state
+  const [openAt, setOpenAt] = useState<string>('');
+  const [closeAt, setCloseAt] = useState<string>('');
+  const [maxResponses, setMaxResponses] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // UI state
   const [isPublishing, setIsPublishing] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<FlowValidationError[]>([]);
 
   const shareUrl = getShareUrl(assessmentId);
 
+  // Initialize form values from existing settings when modal opens
+  useEffect(() => {
+    if (isOpen && settings) {
+      setOpenAt(settings.openAt ? new Date(settings.openAt).toISOString().slice(0, 16) : '');
+      setCloseAt(settings.closeAt ? new Date(settings.closeAt).toISOString().slice(0, 16) : '');
+      setMaxResponses(settings.maxResponses ? String(settings.maxResponses) : '');
+      // Don't pre-fill password (it's hashed in DB)
+      setPassword('');
+    } else if (isOpen) {
+      setOpenAt('');
+      setCloseAt(initialCloseAt ? new Date(initialCloseAt).toISOString().slice(0, 16) : '');
+      setMaxResponses('');
+      setPassword('');
+    }
+    setValidationErrors([]);
+  }, [isOpen, settings, initialCloseAt]);
+
   const handlePublish = useCallback(async () => {
     setIsPublishing(true);
+    setValidationErrors([]);
     try {
-      await onPublish(closeAt ? new Date(closeAt) : undefined);
+      const publishSettings: PublishSettings = {};
+
+      if (closeAt) publishSettings.closeAt = new Date(closeAt);
+      if (openAt) publishSettings.openAt = new Date(openAt);
+      if (maxResponses) publishSettings.maxResponses = parseInt(maxResponses, 10);
+      if (password) publishSettings.password = password;
+
+      const result = await onPublish(publishSettings);
+
+      if (result?.validationErrors?.length) {
+        setValidationErrors(result.validationErrors);
+      }
     } finally {
       setIsPublishing(false);
     }
-  }, [onPublish, closeAt]);
+  }, [onPublish, closeAt, openAt, maxResponses, password]);
 
   const handleClose = useCallback(async () => {
     setIsClosing(true);
@@ -80,6 +135,8 @@ export function PublishModal({
     }
   }, [shareUrl]);
 
+  const hasBlockingErrors = validationErrors.some((e) => e.type === 'error');
+
   if (!isOpen) return null;
 
   return (
@@ -96,11 +153,11 @@ export function PublishModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-md bg-background rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md bg-background rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
             <div className="flex items-center gap-3">
               <div className={cn(
                 'p-2 rounded-lg',
@@ -132,30 +189,142 @@ export function PublishModal({
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-5 overflow-y-auto">
             {status === 'draft' && (
               <>
-                {/* End date picker */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    End date (optional)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={closeAt}
-                    onChange={(e) => setCloseAt(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    The assessment will automatically stop accepting responses after this date
-                  </p>
+                {/* Validation errors */}
+                {validationErrors.length > 0 && (
+                  <div className={cn(
+                    'p-4 rounded-lg border space-y-2',
+                    hasBlockingErrors
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                      : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                  )}>
+                    <div className={cn(
+                      'flex items-center gap-2 font-medium text-sm',
+                      hasBlockingErrors
+                        ? 'text-red-700 dark:text-red-400'
+                        : 'text-amber-700 dark:text-amber-400'
+                    )}>
+                      {hasBlockingErrors ? (
+                        <AlertCircle className="h-4 w-4" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4" />
+                      )}
+                      {hasBlockingErrors ? 'Fix these issues before publishing' : 'Warnings'}
+                    </div>
+                    <ul className="space-y-1">
+                      {validationErrors.map((err, i) => (
+                        <li
+                          key={i}
+                          className={cn(
+                            'text-sm flex items-start gap-2',
+                            err.type === 'error'
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          )}
+                        >
+                          <span className="mt-0.5">•</span>
+                          {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Schedule section */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Schedule
+                  </h3>
+
+                  {/* Start date */}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Start date (optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={openAt}
+                      onChange={(e) => setOpenAt(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+
+                  {/* End date */}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      End date (optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={closeAt}
+                      onChange={(e) => setCloseAt(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* Access control section */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    Access Control
+                  </h3>
+
+                  {/* Response limit */}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Response limit (optional)
+                    </label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="number"
+                        min="1"
+                        value={maxResponses}
+                        onChange={(e) => setMaxResponses(e.target.value)}
+                        placeholder="Unlimited"
+                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Password protection (optional)
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="No password"
+                        className="w-full pl-9 pr-10 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {settings?.password && !password && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Currently password protected. Leave empty to keep existing password.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Publish button */}
                 <button
                   onClick={handlePublish}
-                  disabled={isPublishing}
+                  disabled={isPublishing || hasBlockingErrors}
                   className={cn(
                     'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
                     'bg-primary text-primary-foreground',
@@ -175,6 +344,21 @@ export function PublishModal({
 
             {(status === 'published' || status === 'closed') && (
               <>
+                {/* Response count */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <span className="text-sm font-medium text-foreground">
+                      {responseCount} {responseCount === 1 ? 'response' : 'responses'}
+                    </span>
+                    {settings?.maxResponses && (
+                      <span className="text-sm text-muted-foreground">
+                        {' '}/ {settings.maxResponses} max
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Share link */}
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">
@@ -253,6 +437,11 @@ export function PublishModal({
                   </div>
                 )}
 
+                {/* Active settings summary */}
+                {settings && status === 'published' && (
+                  <ActiveSettingsSummary settings={settings} />
+                )}
+
                 {/* Close button (only for published) */}
                 {status === 'published' && (
                   <button
@@ -279,5 +468,55 @@ export function PublishModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+/**
+ * Compact summary of active publish settings
+ */
+function ActiveSettingsSummary({ settings }: { settings: AssessmentSettings }) {
+  const items: { icon: React.ReactNode; label: string }[] = [];
+
+  if (settings.password) {
+    items.push({ icon: <Lock className="h-3.5 w-3.5" />, label: 'Password protected' });
+  }
+  if (settings.openAt) {
+    items.push({
+      icon: <Calendar className="h-3.5 w-3.5" />,
+      label: `Opens ${new Date(settings.openAt).toLocaleDateString()}`,
+    });
+  }
+  if (settings.closeAt) {
+    items.push({
+      icon: <Calendar className="h-3.5 w-3.5" />,
+      label: `Closes ${new Date(settings.closeAt).toLocaleDateString()}`,
+    });
+  }
+  if (settings.maxResponses) {
+    items.push({
+      icon: <Hash className="h-3.5 w-3.5" />,
+      label: `Max ${settings.maxResponses} responses`,
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        Settings
+      </h4>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
+          >
+            {item.icon}
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

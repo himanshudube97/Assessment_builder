@@ -5,11 +5,13 @@
  * Accessible at /a/[id] for respondents to take the assessment
  */
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, useCallback, use } from 'react';
 import {
   AssessmentFlow,
+  PasswordGate,
   NotFoundState,
   ClosedState,
+  ScheduledState,
   LoadingState,
 } from '@/presentation/components/respondent';
 import type { FlowNode, FlowEdge } from '@/domain/entities/flow';
@@ -29,6 +31,9 @@ interface PublicAssessment {
   status: string;
   isOpen: boolean;
   isClosed: boolean;
+  requiresPassword: boolean;
+  isScheduled: boolean;
+  scheduledOpenAt: string | null;
 }
 
 interface PageProps {
@@ -38,8 +43,18 @@ interface PageProps {
 export default function PublicAssessmentPage({ params }: PageProps) {
   const { id } = use(params);
   const [assessment, setAssessment] = useState<PublicAssessment | null>(null);
-  const [error, setError] = useState<'not_found' | 'closed' | null>(null);
+  const [error, setError] = useState<'not_found' | 'closed' | 'scheduled' | null>(null);
+  const [scheduledOpenAt, setScheduledOpenAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+
+  useEffect(() => {
+    // Check if password was already verified in this session
+    const verified = sessionStorage.getItem(`flowform-pw-${id}`);
+    if (verified === 'verified') {
+      setIsPasswordVerified(true);
+    }
+  }, [id]);
 
   useEffect(() => {
     async function loadAssessment() {
@@ -65,6 +80,12 @@ export default function PublicAssessmentPage({ params }: PageProps) {
           return;
         }
 
+        if (data.isScheduled) {
+          setScheduledOpenAt(data.scheduledOpenAt);
+          setError('scheduled');
+          return;
+        }
+
         setAssessment(data);
       } catch (err) {
         console.error('Error loading assessment:', err);
@@ -76,6 +97,10 @@ export default function PublicAssessmentPage({ params }: PageProps) {
 
     loadAssessment();
   }, [id]);
+
+  const handlePasswordVerified = useCallback(() => {
+    setIsPasswordVerified(true);
+  }, []);
 
   if (isLoading) {
     return <LoadingState />;
@@ -89,8 +114,23 @@ export default function PublicAssessmentPage({ params }: PageProps) {
     return <ClosedState />;
   }
 
+  if (error === 'scheduled') {
+    return <ScheduledState openAt={scheduledOpenAt} />;
+  }
+
   if (!assessment) {
     return <NotFoundState />;
+  }
+
+  // Show password gate if required and not yet verified
+  if (assessment.requiresPassword && !isPasswordVerified) {
+    return (
+      <PasswordGate
+        assessmentId={assessment.id}
+        title={assessment.title}
+        onVerified={handlePasswordVerified}
+      />
+    );
   }
 
   return (
