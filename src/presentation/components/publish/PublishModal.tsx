@@ -2,7 +2,7 @@
 
 /**
  * PublishModal Component
- * Modal for publishing assessments with settings, share link, embed, QR, and close options
+ * Modal for publishing, managing, and sharing assessments
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -31,6 +31,11 @@ import {
   Link,
   Download,
   Mail,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -63,6 +68,8 @@ interface PublishModalProps {
   settings: AssessmentSettings | null;
   onPublish: (settings: PublishSettings) => Promise<{ validationErrors?: FlowValidationError[] }>;
   onCloseAssessment: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
+  onUpdateSettings: (settings: Partial<AssessmentSettings>) => Promise<void>;
 }
 
 type ShareTab = 'link' | 'embed' | 'qr';
@@ -79,6 +86,8 @@ export function PublishModal({
   settings,
   onPublish,
   onCloseAssessment,
+  onUnpublish,
+  onUpdateSettings,
 }: PublishModalProps) {
   // Form state
   const [openAt, setOpenAt] = useState<string>('');
@@ -90,20 +99,30 @@ export function PublishModal({
   // UI state
   const [isPublishing, setIsPublishing] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<FlowValidationError[]>([]);
   const [shareTab, setShareTab] = useState<ShareTab>('link');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const shareUrl = getShareUrl(assessmentId);
 
-  // Initialize form values from existing settings when modal opens
+  // Initialize form values only when modal transitions from closed → open
+  const prevIsOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen && settings) {
+    const justOpened = isOpen && !prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    if (!justOpened) return;
+
+    if (settings) {
       setOpenAt(settings.openAt ? new Date(settings.openAt).toISOString().slice(0, 16) : '');
       setCloseAt(settings.closeAt ? new Date(settings.closeAt).toISOString().slice(0, 16) : '');
       setMaxResponses(settings.maxResponses ? String(settings.maxResponses) : '');
       setPassword('');
-    } else if (isOpen) {
+    } else {
       setOpenAt('');
       setCloseAt(initialCloseAt ? new Date(initialCloseAt).toISOString().slice(0, 16) : '');
       setMaxResponses('');
@@ -112,6 +131,8 @@ export function PublishModal({
     setValidationErrors([]);
     setCopied(null);
     setShareTab('link');
+    setShowAdvanced(false);
+    setSettingsSaved(false);
   }, [isOpen, settings, initialCloseAt]);
 
   const handlePublish = useCallback(async () => {
@@ -144,6 +165,33 @@ export function PublishModal({
     }
   }, [onCloseAssessment]);
 
+  const handleUnpublish = useCallback(async () => {
+    setIsUnpublishing(true);
+    try {
+      await onUnpublish();
+    } finally {
+      setIsUnpublishing(false);
+    }
+  }, [onUnpublish]);
+
+  const handleSaveSettings = useCallback(async () => {
+    setIsSavingSettings(true);
+    setSettingsSaved(false);
+    try {
+      const update: Partial<AssessmentSettings> = {};
+
+      update.openAt = openAt ? new Date(openAt) : null;
+      update.closeAt = closeAt ? new Date(closeAt) : null;
+      update.maxResponses = maxResponses ? parseInt(maxResponses, 10) : null;
+
+      await onUpdateSettings(update);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }, [onUpdateSettings, openAt, closeAt, maxResponses]);
+
   const handleCopy = useCallback(async (text: string, key: string) => {
     const success = await copyToClipboard(text);
     if (success) {
@@ -154,15 +202,11 @@ export function PublishModal({
 
   const handleToggleInviteOnly = useCallback(async (enabled: boolean) => {
     try {
-      await fetch(`/api/assessments/${assessmentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { inviteOnly: enabled } }),
-      });
+      await onUpdateSettings({ inviteOnly: enabled });
     } catch (err) {
       console.error('Failed to update invite-only setting:', err);
     }
-  }, [assessmentId]);
+  }, [onUpdateSettings]);
 
   const hasBlockingErrors = validationErrors.some((e) => e.type === 'error');
 
@@ -182,7 +226,7 @@ export function PublishModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-md bg-background rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          className="relative w-full max-w-lg bg-background rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -190,7 +234,9 @@ export function PublishModal({
             <div className="flex items-center gap-3">
               <div className={cn(
                 'p-2 rounded-lg',
-                status === 'published' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-muted'
+                status === 'published'
+                  ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                  : 'bg-muted'
               )}>
                 {status === 'published' ? (
                   <Globe className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -204,7 +250,7 @@ export function PublishModal({
                 <h2 className="font-semibold text-foreground">
                   {status === 'published' ? 'Published' : status === 'closed' ? 'Closed' : 'Publish Assessment'}
                 </h2>
-                <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                <p className="text-sm text-muted-foreground truncate max-w-[280px]">
                   {title}
                 </p>
               </div>
@@ -219,6 +265,8 @@ export function PublishModal({
 
           {/* Content */}
           <div className="p-6 space-y-5 overflow-y-auto">
+
+            {/* ===== DRAFT VIEW ===== */}
             {status === 'draft' && (
               <>
                 {/* Validation errors */}
@@ -253,7 +301,7 @@ export function PublishModal({
                               : 'text-amber-600 dark:text-amber-400'
                           )}
                         >
-                          <span className="mt-0.5">•</span>
+                          <span className="mt-0.5">&bull;</span>
                           {err.message}
                         </li>
                       ))}
@@ -261,297 +309,214 @@ export function PublishModal({
                   </div>
                 )}
 
-                {/* Schedule section */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    Schedule
-                  </h3>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Start date (optional)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={openAt}
-                      onChange={(e) => setOpenAt(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      End date (optional)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={closeAt}
-                      onChange={(e) => setCloseAt(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-
-                {/* Access control section */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    Access Control
-                  </h3>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Response limit (optional)
-                    </label>
-                    <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type="number"
-                        min="1"
-                        value={maxResponses}
-                        onChange={(e) => setMaxResponses(e.target.value)}
-                        placeholder="Unlimited"
-                        className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Password protection (optional)
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="No password"
-                        className="w-full pl-9 pr-10 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {settings?.password && !password && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Currently password protected. Leave empty to keep existing password.
-                      </p>
+                {/* Simple publish — just one big button */}
+                <div className="text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Make your assessment live and start collecting responses.
+                  </p>
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing || hasBlockingErrors}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all text-base',
+                      'bg-primary text-primary-foreground',
+                      'hover:bg-primary/90',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
                     )}
-                  </div>
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Globe className="h-5 w-5" />
+                    )}
+                    Publish Now
+                  </button>
                 </div>
 
-                {/* Invite-Only Mode */}
-                <InviteManager
-                  assessmentId={assessmentId}
-                  inviteOnly={settings?.inviteOnly ?? false}
-                  onToggleInviteOnly={handleToggleInviteOnly}
-                />
+                {/* Advanced options — collapsed by default */}
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <span>Advanced Options</span>
+                    {showAdvanced ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </button>
 
-                {/* Publish button */}
-                <button
-                  onClick={handlePublish}
-                  disabled={isPublishing || hasBlockingErrors}
-                  className={cn(
-                    'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
-                    'bg-primary text-primary-foreground',
-                    'hover:bg-primary/90',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
-                >
-                  {isPublishing ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Globe className="h-5 w-5" />
-                  )}
-                  Publish Assessment
-                </button>
+                  <AnimatePresence>
+                    {showAdvanced && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                          <SettingsForm
+                            openAt={openAt}
+                            setOpenAt={setOpenAt}
+                            closeAt={closeAt}
+                            setCloseAt={setCloseAt}
+                            maxResponses={maxResponses}
+                            setMaxResponses={setMaxResponses}
+                            password={password}
+                            setPassword={setPassword}
+                            showPassword={showPassword}
+                            setShowPassword={setShowPassword}
+                            hasExistingPassword={!!settings?.password}
+                          />
+
+                          {/* Invite-Only Mode */}
+                          <InviteManager
+                            assessmentId={assessmentId}
+                            inviteOnly={settings?.inviteOnly ?? false}
+                            onToggleInviteOnly={handleToggleInviteOnly}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </>
             )}
 
-            {(status === 'published' || status === 'closed') && (
+            {/* ===== PUBLISHED VIEW ===== */}
+            {status === 'published' && (
               <>
-                {/* Response count */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <span className="text-sm font-medium text-foreground">
+                {/* Live badge + response count */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <div className="relative">
+                      <Globe className="h-4 w-4" />
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+                    </div>
+                    <span className="font-medium text-sm">Live</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>
                       {responseCount} {responseCount === 1 ? 'response' : 'responses'}
+                      {settings?.maxResponses && <> / {settings.maxResponses} max</>}
                     </span>
-                    {settings?.maxResponses && (
-                      <span className="text-sm text-muted-foreground">
-                        {' '}/ {settings.maxResponses} max
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 {/* Share tabs */}
-                <div className="space-y-4">
-                  <div className="flex gap-1 p-1 rounded-lg bg-muted">
-                    {([
-                      { key: 'link' as const, label: 'Link', icon: Link },
-                      { key: 'embed' as const, label: 'Embed', icon: Code },
-                      { key: 'qr' as const, label: 'QR Code', icon: QrCode },
-                    ]).map(({ key, label, icon: Icon }) => (
-                      <button
-                        key={key}
-                        onClick={() => setShareTab(key)}
-                        className={cn(
-                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-                          shareTab === key
-                            ? 'bg-background text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                <ShareTabs
+                  shareTab={shareTab}
+                  setShareTab={setShareTab}
+                  shareUrl={shareUrl}
+                  assessmentId={assessmentId}
+                  settings={settings}
+                  copied={copied}
+                  onCopy={handleCopy}
+                />
 
-                  {/* Link tab */}
-                  {shareTab === 'link' && (
-                    <div className="space-y-3">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={shareUrl}
-                          readOnly
-                          className="flex-1 px-4 py-2 rounded-lg border border-border bg-muted text-foreground text-sm"
-                        />
-                        <button
-                          onClick={() => handleCopy(shareUrl, 'link')}
-                          className={cn(
-                            'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
-                            copied === 'link'
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                          )}
-                        >
-                          {copied === 'link' ? (
-                            <><Check className="h-4 w-4" /> Copied</>
-                          ) : (
-                            <><Copy className="h-4 w-4" /> Copy</>
-                          )}
-                        </button>
-                      </div>
-                      <a
-                        href={shareUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Open Assessment
-                      </a>
-                    </div>
-                  )}
+                {/* Editable settings */}
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit Settings
+                    </span>
+                    {showAdvanced ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </button>
 
-                  {/* Embed tab */}
-                  {shareTab === 'embed' && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                          Inline embed
-                        </label>
-                        <div className="relative">
-                          <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all">
-                            {getIframeEmbedCode(assessmentId)}
-                          </pre>
+                  <AnimatePresence>
+                    {showAdvanced && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                          <SettingsForm
+                            openAt={openAt}
+                            setOpenAt={setOpenAt}
+                            closeAt={closeAt}
+                            setCloseAt={setCloseAt}
+                            maxResponses={maxResponses}
+                            setMaxResponses={setMaxResponses}
+                            password={password}
+                            setPassword={setPassword}
+                            showPassword={showPassword}
+                            setShowPassword={setShowPassword}
+                            hasExistingPassword={!!settings?.password}
+                          />
+
+                          {/* Invite-Only Mode */}
+                          <InviteManager
+                            assessmentId={assessmentId}
+                            inviteOnly={settings?.inviteOnly ?? false}
+                            onToggleInviteOnly={handleToggleInviteOnly}
+                          />
+
                           <button
-                            onClick={() => handleCopy(getIframeEmbedCode(assessmentId), 'iframe')}
+                            onClick={handleSaveSettings}
+                            disabled={isSavingSettings}
                             className={cn(
-                              'absolute top-2 right-2 p-1.5 rounded-md transition-all',
-                              copied === 'iframe'
+                              'w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all',
+                              settingsSaved
                                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                                : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                              'disabled:opacity-50'
                             )}
                           >
-                            {copied === 'iframe' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                          Popup button
-                        </label>
-                        <div className="relative">
-                          <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-32">
-                            {getPopupEmbedCode(assessmentId, settings?.primaryColor)}
-                          </pre>
-                          <button
-                            onClick={() => handleCopy(getPopupEmbedCode(assessmentId), 'popup')}
-                            className={cn(
-                              'absolute top-2 right-2 p-1.5 rounded-md transition-all',
-                              copied === 'popup'
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                            {isSavingSettings ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : settingsSaved ? (
+                              <><Check className="h-4 w-4" /> Settings Saved</>
+                            ) : (
+                              <><Save className="h-4 w-4" /> Save Settings</>
                             )}
-                          >
-                            {copied === 'popup' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                           </button>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* QR Code tab */}
-                  {shareTab === 'qr' && (
-                    <QRCodePanel shareUrl={shareUrl} />
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* Status info */}
-                {status === 'published' && (
-                  <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                      <Globe className="h-4 w-4" />
-                      <span className="font-medium">Live</span>
-                    </div>
-                    <p className="text-sm text-emerald-600 dark:text-emerald-500 mt-1">
-                      Your assessment is accepting responses
-                      {initialCloseAt && (
-                        <> until {new Date(initialCloseAt).toLocaleDateString()}</>
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {status === 'closed' && (
-                  <div className="p-4 rounded-lg bg-muted border border-border">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Lock className="h-4 w-4" />
-                      <span className="font-medium">Closed</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      This assessment is no longer accepting responses
-                    </p>
-                  </div>
-                )}
-
-                {/* Invite-Only Mode (published) */}
-                {status === 'published' && (
-                  <InviteManager
-                    assessmentId={assessmentId}
-                    inviteOnly={settings?.inviteOnly ?? false}
-                    onToggleInviteOnly={handleToggleInviteOnly}
-                  />
-                )}
-
                 {/* Active settings summary */}
-                {settings && status === 'published' && (
-                  <ActiveSettingsSummary settings={settings} />
-                )}
+                {settings && <ActiveSettingsSummary settings={settings} />}
 
-                {/* Close button (only for published) */}
-                {status === 'published' && (
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleUnpublish}
+                    disabled={isUnpublishing || isClosing}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all',
+                      'border border-border text-muted-foreground',
+                      'hover:bg-muted hover:text-foreground',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    {isUnpublishing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                    Unpublish
+                  </button>
                   <button
                     onClick={handleClose}
-                    disabled={isClosing}
+                    disabled={isClosing || isUnpublishing}
                     className={cn(
-                      'w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
+                      'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all',
                       'border border-destructive text-destructive',
                       'hover:bg-destructive/10',
                       'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -562,9 +527,87 @@ export function PublishModal({
                     ) : (
                       <Lock className="h-4 w-4" />
                     )}
-                    Close Assessment
+                    Close
                   </button>
-                )}
+                </div>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  <strong>Unpublish</strong> reverts to draft (can edit flow). <strong>Close</strong> stops collecting responses.
+                </p>
+              </>
+            )}
+
+            {/* ===== CLOSED VIEW ===== */}
+            {status === 'closed' && (
+              <>
+                {/* Closed badge */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-medium text-sm">Closed</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>{responseCount} {responseCount === 1 ? 'response' : 'responses'}</span>
+                  </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  This assessment is no longer accepting responses. You can reopen it to start collecting again, or unpublish to edit the flow.
+                </p>
+
+                {/* Share tabs */}
+                <ShareTabs
+                  shareTab={shareTab}
+                  setShareTab={setShareTab}
+                  shareUrl={shareUrl}
+                  assessmentId={assessmentId}
+                  settings={settings}
+                  copied={copied}
+                  onCopy={handleCopy}
+                />
+
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing || isUnpublishing}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all',
+                      'bg-primary text-primary-foreground',
+                      'hover:bg-primary/90',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Globe className="h-4 w-4" />
+                    )}
+                    Reopen
+                  </button>
+                  <button
+                    onClick={handleUnpublish}
+                    disabled={isUnpublishing || isPublishing}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all',
+                      'border border-border text-muted-foreground',
+                      'hover:bg-muted hover:text-foreground',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    {isUnpublishing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" />
+                    )}
+                    Unpublish to Draft
+                  </button>
+                </div>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  <strong>Reopen</strong> starts accepting responses again. <strong>Unpublish</strong> reverts to draft so you can edit the flow.
+                </p>
               </>
             )}
           </div>
@@ -574,9 +617,249 @@ export function PublishModal({
   );
 }
 
-/**
- * QR Code panel with download functionality
- */
+// ============================================
+// Settings Form (reused in draft & published views)
+// ============================================
+
+interface SettingsFormProps {
+  openAt: string;
+  setOpenAt: (v: string) => void;
+  closeAt: string;
+  setCloseAt: (v: string) => void;
+  maxResponses: string;
+  setMaxResponses: (v: string) => void;
+  password: string;
+  setPassword: (v: string) => void;
+  showPassword: boolean;
+  setShowPassword: (v: boolean) => void;
+  hasExistingPassword: boolean;
+}
+
+function SettingsForm({
+  openAt,
+  setOpenAt,
+  closeAt,
+  setCloseAt,
+  maxResponses,
+  setMaxResponses,
+  password,
+  setPassword,
+  showPassword,
+  setShowPassword,
+  hasExistingPassword,
+}: SettingsFormProps) {
+  return (
+    <>
+      {/* Schedule */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          Schedule
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Start date</label>
+            <input
+              type="datetime-local"
+              value={openAt}
+              onChange={(e) => setOpenAt(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">End date</label>
+            <input
+              type="datetime-local"
+              value={closeAt}
+              onChange={(e) => setCloseAt(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Access control */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Shield className="h-4 w-4 text-muted-foreground" />
+          Access Control
+        </h3>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Response limit</label>
+          <div className="relative">
+            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="number"
+              min="1"
+              value={maxResponses}
+              onChange={(e) => setMaxResponses(e.target.value)}
+              placeholder="Unlimited"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Password protection</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="No password"
+              className="w-full pl-9 pr-10 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {hasExistingPassword && !password && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Currently password protected. Leave empty to keep existing.
+            </p>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ============================================
+// Share Tabs (reused in published & closed views)
+// ============================================
+
+interface ShareTabsProps {
+  shareTab: ShareTab;
+  setShareTab: (tab: ShareTab) => void;
+  shareUrl: string;
+  assessmentId: string;
+  settings: AssessmentSettings | null;
+  copied: string | null;
+  onCopy: (text: string, key: string) => void;
+}
+
+function ShareTabs({ shareTab, setShareTab, shareUrl, assessmentId, settings, copied, onCopy }: ShareTabsProps) {
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1 p-1 rounded-lg bg-muted">
+        {([
+          { key: 'link' as const, label: 'Link', icon: Link },
+          { key: 'embed' as const, label: 'Embed', icon: Code },
+          { key: 'qr' as const, label: 'QR Code', icon: QrCode },
+        ]).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setShareTab(key)}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+              shareTab === key
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {shareTab === 'link' && (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={shareUrl}
+              readOnly
+              className="flex-1 px-4 py-2 rounded-lg border border-border bg-muted text-foreground text-sm"
+            />
+            <button
+              onClick={() => onCopy(shareUrl, 'link')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
+                copied === 'link'
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              )}
+            >
+              {copied === 'link' ? (
+                <><Check className="h-4 w-4" /> Copied</>
+              ) : (
+                <><Copy className="h-4 w-4" /> Copy</>
+              )}
+            </button>
+          </div>
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted text-sm"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open Assessment
+          </a>
+        </div>
+      )}
+
+      {shareTab === 'embed' && (
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              Inline embed
+            </label>
+            <div className="relative">
+              <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all">
+                {getIframeEmbedCode(assessmentId)}
+              </pre>
+              <button
+                onClick={() => onCopy(getIframeEmbedCode(assessmentId), 'iframe')}
+                className={cn(
+                  'absolute top-2 right-2 p-1.5 rounded-md transition-all',
+                  copied === 'iframe'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                )}
+              >
+                {copied === 'iframe' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              Popup button
+            </label>
+            <div className="relative">
+              <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-32">
+                {getPopupEmbedCode(assessmentId, settings?.primaryColor)}
+              </pre>
+              <button
+                onClick={() => onCopy(getPopupEmbedCode(assessmentId), 'popup')}
+                className={cn(
+                  'absolute top-2 right-2 p-1.5 rounded-md transition-all',
+                  copied === 'popup'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                )}
+              >
+                {copied === 'popup' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shareTab === 'qr' && <QRCodePanel shareUrl={shareUrl} />}
+    </div>
+  );
+}
+
+// ============================================
+// QR Code Panel
+// ============================================
+
 function QRCodePanel({ shareUrl }: { shareUrl: string }) {
   const [qrSize, setQrSize] = useState<'sm' | 'md' | 'lg'>('md');
   const qrRef = useRef<HTMLDivElement>(null);
@@ -589,7 +872,7 @@ function QRCodePanel({ shareUrl }: { shareUrl: string }) {
     if (!svgElement) return;
 
     const canvas = document.createElement('canvas');
-    const downloadSize = sizeMap.lg * 2; // High-res download
+    const downloadSize = sizeMap.lg * 2;
     canvas.width = downloadSize;
     canvas.height = downloadSize;
     const ctx = canvas.getContext('2d');
@@ -613,15 +896,9 @@ function QRCodePanel({ shareUrl }: { shareUrl: string }) {
   return (
     <div className="flex flex-col items-center gap-4">
       <div ref={qrRef} className="p-4 bg-white rounded-lg">
-        <QRCodeSVG
-          value={shareUrl}
-          size={size}
-          level="M"
-          includeMargin={false}
-        />
+        <QRCodeSVG value={shareUrl} size={size} level="M" includeMargin={false} />
       </div>
 
-      {/* Size selector */}
       <div className="flex gap-1 p-1 rounded-lg bg-muted">
         {(['sm', 'md', 'lg'] as const).map((s) => (
           <button
@@ -639,10 +916,9 @@ function QRCodePanel({ shareUrl }: { shareUrl: string }) {
         ))}
       </div>
 
-      {/* Download button */}
       <button
         onClick={handleDownload}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted text-sm"
       >
         <Download className="h-4 w-4" />
         Download PNG
@@ -651,9 +927,10 @@ function QRCodePanel({ shareUrl }: { shareUrl: string }) {
   );
 }
 
-/**
- * Compact summary of active publish settings
- */
+// ============================================
+// Active Settings Summary
+// ============================================
+
 function ActiveSettingsSummary({ settings }: { settings: AssessmentSettings }) {
   const items: { icon: React.ReactNode; label: string }[] = [];
 
@@ -687,7 +964,7 @@ function ActiveSettingsSummary({ settings }: { settings: AssessmentSettings }) {
   return (
     <div className="space-y-1.5">
       <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-        Settings
+        Active Settings
       </h4>
       <div className="flex flex-wrap gap-2">
         {items.map((item, i) => (

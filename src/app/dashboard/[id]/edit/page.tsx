@@ -225,6 +225,39 @@ export default function EditorPage({ params }: EditorPageProps) {
     }
   }, [id, setStatus]);
 
+  // Unpublish assessment (revert to draft)
+  const handleUnpublish = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/assessments/${id}/unpublish`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to unpublish');
+      }
+
+      setStatus('draft');
+    } catch (err) {
+      console.error('Error unpublishing:', err);
+      throw err;
+    }
+  }, [id, setStatus]);
+
+  // Update publish settings (schedule, max responses, etc.) while published
+  const handleUpdatePublishSettings = useCallback(async (settingsUpdate: Partial<AssessmentSettings>) => {
+    const response = await fetch(`/api/assessments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: settingsUpdate }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update settings');
+    }
+
+    updateSettings(settingsUpdate);
+  }, [id, updateSettings]);
+
   // Update appearance/theme settings
   const handleSettingsChange = useCallback(async (themeSettings: Partial<AssessmentSettings>) => {
     const response = await fetch(`/api/assessments/${id}`, {
@@ -627,6 +660,8 @@ export default function EditorPage({ params }: EditorPageProps) {
         settings={settings}
         onPublish={handlePublish}
         onCloseAssessment={handleCloseAssessment}
+        onUnpublish={handleUnpublish}
+        onUpdateSettings={handleUpdatePublishSettings}
       />
     </div>
   );
