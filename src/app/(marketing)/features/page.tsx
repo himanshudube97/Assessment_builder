@@ -12,15 +12,44 @@ import {
   Table2,
   Smartphone,
   ArrowRight,
+  Hash,
+  Mail,
+  ChevronDown,
+  Calendar,
+  Gauge,
+  Type,
+  Palette,
+  BarChart3,
+  Lock,
+  QrCode,
+  Code2,
+  Link2,
+  Award,
 } from 'lucide-react';
 import { Section, SectionHeader, CTAButton } from '@/presentation/components/marketing';
+import {
+  FlowBuilderIllust,
+  BranchingIllust,
+  ScoringIllust,
+  ThemesIllust,
+  AnalyticsIllust,
+  ResponseTableIllust,
+  SharingIllust,
+  MobileIllust,
+} from '@/presentation/components/marketing/illustrations';
 
 const questionTypes = [
   { icon: MessageSquare, name: 'Multiple Choice', description: 'Single select from options' },
-  { icon: CheckSquare, name: 'Checkbox', description: 'Multi-select options' },
-  { icon: AlignLeft, name: 'Text', description: 'Short or long text input' },
-  { icon: Star, name: 'Rating', description: 'Star or number scale' },
+  { icon: CheckSquare, name: 'Checkbox', description: 'Multi-select with min/max' },
+  { icon: Type, name: 'Short Text', description: 'Single-line text input' },
+  { icon: AlignLeft, name: 'Long Text', description: 'Multi-line text input' },
+  { icon: Star, name: 'Rating', description: 'Configurable scale' },
   { icon: ToggleLeft, name: 'Yes/No', description: 'Binary choice' },
+  { icon: Hash, name: 'Number', description: 'Numeric input' },
+  { icon: Mail, name: 'Email', description: 'Email with validation' },
+  { icon: ChevronDown, name: 'Dropdown', description: 'Dropdown selection' },
+  { icon: Calendar, name: 'Date', description: 'Date picker' },
+  { icon: Gauge, name: 'NPS', description: '0-10 promoter score' },
 ];
 
 const features = [
@@ -31,33 +60,89 @@ const features = [
       'Drag and drop questions onto the canvas',
       'Visual connections between questions',
       'Zoom, pan, and organize your flow',
-      'Real-time preview of your assessment',
+      'Undo/redo with full history',
+      'Auto-layout for clean organization',
     ],
     icon: Workflow,
+    Illustration: FlowBuilderIllust,
     reverse: false,
   },
   {
     title: 'Smart Branching',
     description: 'Create dynamic paths that adapt to each respondent. Route people to different questions based on their answers for a personalized experience.',
     details: [
-      'Condition-based routing',
-      'Multiple paths from single questions',
-      'Skip logic and conditional display',
+      'Per-option branching for MCQ and Yes/No',
+      'Conditional edges (equals, contains, greater/less than)',
+      'Answer piping — reference previous answers in questions',
       'Complex decision trees made simple',
     ],
     icon: GitBranch,
+    Illustration: BranchingIllust,
     reverse: true,
   },
   {
-    title: 'Google Sheets Integration',
-    description: 'Automatically sync responses to Google Sheets in real-time. Analyze, filter, and share your data with ease.',
+    title: 'Scoring & NPS',
+    description: 'Assign points to options, track scores per question, and display results on the end screen. Built-in Net Promoter Score with promoter/detractor breakdown.',
     details: [
-      'One-click connection to Sheets',
-      'Real-time response syncing',
-      'Custom column mapping',
-      'Preserve response history',
+      'Per-option point values',
+      'Show score on completion screen',
+      'NPS gauge with distribution chart',
+      'Score distribution analytics',
+    ],
+    icon: Award,
+    Illustration: ScoringIllust,
+    reverse: false,
+  },
+  {
+    title: 'Themes & Customization',
+    description: 'Make every assessment feel on-brand. Choose from 6 pre-built templates or customize colors, fonts, border radius, button style, and card style.',
+    details: [
+      '6 pre-built templates (Midnight, Ocean, Forest, Sunset, Minimal)',
+      'Custom primary and background colors',
+      'Font family selector (Inter, Merriweather, Geist)',
+      'Button style and card style options',
+    ],
+    icon: Palette,
+    Illustration: ThemesIllust,
+    reverse: true,
+  },
+  {
+    title: 'Analytics Dashboard',
+    description: 'Understand your responses with a full analytics suite. Track completion rates, time to complete, score distribution, and response trends.',
+    details: [
+      'Response timeline and trend charts',
+      'Score distribution histogram',
+      'Device and source breakdown',
+      'CSV export for all responses',
+    ],
+    icon: BarChart3,
+    Illustration: AnalyticsIllust,
+    reverse: false,
+  },
+  {
+    title: 'Response Management',
+    description: 'All responses are stored securely and available in real-time. Filter, sort, and export your data whenever you need it.',
+    details: [
+      'Real-time response collection',
+      'Sortable and filterable response table',
+      'Time-to-complete tracking per response',
+      'CSV export for offline analysis',
     ],
     icon: Table2,
+    Illustration: ResponseTableIllust,
+    reverse: true,
+  },
+  {
+    title: 'Sharing & Access Control',
+    description: 'Share assessments via direct link, embed code, or QR code. Control who can respond with password protection, invite-only mode, and scheduling.',
+    details: [
+      'Password-protected assessments',
+      'Invite-only with email or anonymous links',
+      'Schedule open and close dates',
+      'Response limits and QR code sharing',
+    ],
+    icon: Lock,
+    Illustration: SharingIllust,
     reverse: false,
   },
   {
@@ -66,10 +151,11 @@ const features = [
     details: [
       'Responsive design out of the box',
       'Touch-friendly interactions',
-      'Fast loading on any connection',
+      'Embeddable via iframe or popup',
       'Typeform-style one question per screen',
     ],
     icon: Smartphone,
+    Illustration: MobileIllust,
     reverse: true,
   },
 ];
@@ -155,25 +241,7 @@ export default function FeaturesPage() {
               className={feature.reverse ? 'lg:order-1' : ''}
             >
               {/* Feature Illustration */}
-              <motion.div
-                whileHover={{ scale: 1.02, y: -4 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="relative aspect-video rounded-2xl border border-border bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center overflow-hidden cursor-pointer group"
-              >
-                <motion.div
-                  animate={{ scale: [1, 1.1, 1], rotate: [0, 5, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <feature.icon className="w-24 h-24 text-indigo-500/20 group-hover:text-indigo-500/30 transition-colors" />
-                </motion.div>
-                <div className="absolute inset-0 bg-gradient-to-t from-background/50 to-transparent" />
-                {/* Glow effect on hover */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  whileHover={{ opacity: 1 }}
-                  className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-violet-500/10"
-                />
-              </motion.div>
+              <feature.Illustration />
             </motion.div>
           </div>
         </Section>
@@ -182,18 +250,18 @@ export default function FeaturesPage() {
       {/* Question Types */}
       <Section>
         <SectionHeader
-          title="6 Question Types"
+          title="11 Question Types"
           subtitle="All the building blocks you need for comprehensive assessments"
         />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {questionTypes.map((type, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
+              transition={{ duration: 0.4, delay: index * 0.05 }}
               whileHover={{ y: -4, scale: 1.02 }}
               className="p-4 rounded-xl border border-border bg-card text-center cursor-pointer transition-shadow duration-200 hover:shadow-lg hover:shadow-indigo-500/5"
             >
@@ -210,42 +278,35 @@ export default function FeaturesPage() {
         </div>
       </Section>
 
-      {/* Integrations */}
+      {/* Sharing & Embed */}
       <Section className="bg-muted/30">
         <SectionHeader
-          title="Integrations"
-          subtitle="Connect FlowForm to your favorite tools"
+          title="Share Anywhere"
+          subtitle="Multiple ways to distribute your assessments"
         />
 
         <div className="flex flex-wrap justify-center gap-6">
           {[
-            { icon: Table2, name: 'Google Sheets', status: 'Available now', available: true },
-            { icon: null, name: 'REST API', status: 'Coming soon', available: false },
-            { icon: null, name: 'Zapier', status: 'Coming soon', available: false },
-          ].map((integration, index) => (
+            { icon: Link2, name: 'Direct Link', description: 'Shareable URL', available: true },
+            { icon: Code2, name: 'Embed', description: 'Inline or popup iframe', available: true },
+            { icon: QrCode, name: 'QR Code', description: 'Downloadable PNG', available: true },
+            { icon: Table2, name: 'CSV Export', description: 'Download responses', available: true },
+          ].map((item, index) => (
             <motion.div
-              key={integration.name}
+              key={item.name}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
-              whileHover={integration.available ? { y: -4, scale: 1.02 } : {}}
-              className={`flex items-center gap-3 px-6 py-4 rounded-xl border border-border bg-card ${
-                !integration.available ? 'opacity-60' : 'cursor-pointer'
-              }`}
+              whileHover={{ y: -4, scale: 1.02 }}
+              className="flex items-center gap-3 px-6 py-4 rounded-xl border border-border bg-card cursor-pointer"
             >
-              {integration.icon ? (
-                <motion.div whileHover={{ rotate: 10 }}>
-                  <integration.icon className="w-8 h-8 text-emerald-500" />
-                </motion.div>
-              ) : (
-                <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                  {integration.name === 'REST API' ? 'API' : 'Zap'}
-                </div>
-              )}
+              <motion.div whileHover={{ rotate: 10 }}>
+                <item.icon className="w-8 h-8 text-indigo-500" />
+              </motion.div>
               <div>
-                <p className="font-medium text-foreground">{integration.name}</p>
-                <p className="text-sm text-muted-foreground">{integration.status}</p>
+                <p className="font-medium text-foreground">{item.name}</p>
+                <p className="text-sm text-muted-foreground">{item.description}</p>
               </div>
             </motion.div>
           ))}

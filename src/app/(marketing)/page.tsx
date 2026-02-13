@@ -12,6 +12,10 @@ import {
   Workflow,
   Zap,
   Table2,
+  Palette,
+  BarChart3,
+  Lock,
+  Award,
   LucideIcon,
 } from 'lucide-react';
 import { Section, SectionHeader, FeatureCard, CTAButton, CanvasPreview } from '@/presentation/components/marketing';
@@ -146,7 +150,7 @@ export default function LandingPage() {
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8"
           >
             Visual flow builder for surveys, quizzes, and interactive forms.
-            Create dynamic paths based on responses.
+            11 question types, smart branching, themes, analytics, and more.
           </motion.p>
           <motion.div
             variants={fadeInUp}
@@ -188,13 +192,13 @@ export default function LandingPage() {
           <FeatureCard
             icon={GitBranch}
             title="Branch Logic"
-            description="Route respondents to different questions based on their answers. No more irrelevant questions."
+            description="Route respondents to different questions based on their answers. Per-option branching and conditional edges."
             index={0}
           />
           <FeatureCard
             icon={MousePointer2}
             title="Visual Builder"
-            description="Drag and drop nodes on a canvas. See your entire flow at a glance."
+            description="Drag and drop nodes on a canvas. See your entire flow at a glance with undo/redo and auto-layout."
             index={1}
           />
           <FeatureCard
@@ -213,24 +217,42 @@ export default function LandingPage() {
           subtitle="Powerful features to create engaging assessments"
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           <FeatureCard
             icon={Workflow}
             title="Visual Canvas"
-            description="Drag-and-drop node editor with smooth animations and intuitive controls."
+            description="Drag-and-drop node editor with smooth animations, auto-layout, and undo/redo."
             index={0}
           />
           <FeatureCard
             icon={Zap}
             title="Smart Branching"
-            description="Condition-based paths that adapt to each respondent's answers."
+            description="Condition-based paths with answer piping that adapt to each respondent."
             index={1}
           />
           <FeatureCard
-            icon={Table2}
-            title="Google Sheets"
-            description="Responses automatically sync to your spreadsheet in real-time."
+            icon={Award}
+            title="Scoring & NPS"
+            description="Per-option points, score display on completion, and built-in NPS tracking."
             index={2}
+          />
+          <FeatureCard
+            icon={Palette}
+            title="Themes & Templates"
+            description="6 pre-built templates plus custom colors, fonts, button and card styles."
+            index={3}
+          />
+          <FeatureCard
+            icon={BarChart3}
+            title="Analytics"
+            description="Response trends, score distribution, device breakdown, and CSV export."
+            index={4}
+          />
+          <FeatureCard
+            icon={Lock}
+            title="Access Control"
+            description="Password protection, invite-only mode, scheduling, and response limits."
+            index={5}
           />
         </div>
       </Section>
@@ -246,19 +268,19 @@ export default function LandingPage() {
           <StepNumber
             step="1"
             title="Design your flow"
-            description="Drag questions onto the canvas and connect them visually."
+            description="Drag questions onto the canvas and connect them visually. Choose from 11 question types."
             index={0}
           />
           <StepNumber
             step="2"
             title="Share the link"
-            description="Publish your assessment and share it anywhere."
+            description="Publish your assessment and share via link, embed code, or QR code."
             index={1}
           />
           <StepNumber
             step="3"
-            title="Collect responses"
-            description="Watch responses come in and analyze the results."
+            title="Analyze responses"
+            description="Track results in real-time with charts, scores, and CSV export."
             index={2}
           />
         </div>
@@ -275,19 +297,19 @@ export default function LandingPage() {
           <UseCaseCard
             icon={GraduationCap}
             title="Educators"
-            description="Create adaptive knowledge checks that adjust difficulty based on student responses."
+            description="Create adaptive quizzes with scoring, NPS feedback, and branching difficulty paths."
             index={0}
           />
           <UseCaseCard
             icon={Users}
             title="HR Teams"
-            description="Build screening assessments that route candidates based on qualifications."
+            description="Build screening assessments with invite-only access and analytics dashboards."
             index={1}
           />
           <UseCaseCard
             icon={Heart}
             title="Coaches"
-            description="Design client intake forms that gather relevant information based on goals."
+            description="Design themed intake forms with password protection and custom branding."
             index={2}
           />
         </div>

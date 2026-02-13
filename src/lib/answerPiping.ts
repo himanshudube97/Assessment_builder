@@ -46,7 +46,7 @@ export function getDisplayText(text: string): string {
  * Check if text contains any pipe references.
  */
 export function hasPipeReferences(text: string): boolean {
-  return PIPE_REGEX.test(text);
+  return new RegExp(PIPE_REGEX.source).test(text);
 }
 
 /**
