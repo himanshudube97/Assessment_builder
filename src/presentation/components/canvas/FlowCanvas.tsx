@@ -14,6 +14,9 @@ import ReactFlow, {
   ReactFlowProvider,
   useReactFlow,
   useUpdateNodeInternals,
+  reconnectEdge,
+  type Edge,
+  type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { LayoutGrid } from 'lucide-react';
@@ -142,6 +145,36 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
     }
   }, [newlyAddedNodeId, clearNewlyAddedNode]);
 
+  // Allow dragging edge endpoints to reconnect them (e.g. from Option A to Option B)
+  const edgeReconnectSuccessful = useRef(true);
+
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
+
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      edgeReconnectSuccessful.current = true;
+      onEdgesChange(
+        // Remove the old edge, then add the reconnected one via onConnect
+        [{ id: oldEdge.id, type: 'remove' as const }]
+      );
+      onConnect(newConnection);
+    },
+    [onEdgesChange, onConnect]
+  );
+
+  const onReconnectEnd = useCallback(
+    (_: MouseEvent | TouchEvent, edge: Edge) => {
+      // If reconnect was not successful (dropped on empty space), remove the edge
+      if (!edgeReconnectSuccessful.current) {
+        onEdgesChange([{ id: edge.id, type: 'remove' as const }]);
+      }
+      edgeReconnectSuccessful.current = true;
+    },
+    [onEdgesChange]
+  );
+
   return (
     <div ref={reactFlowWrapper} className="flex-1 h-full relative">
       {/* SVG Arrow Markers for edges - Improved styling */}
@@ -197,6 +230,10 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        onReconnectStart={onReconnectStart}
+        onReconnectEnd={onReconnectEnd}
+        edgesUpdatable
         onDragOver={onDragOver}
         onDrop={onDrop}
         onPaneClick={onPaneClick}

@@ -281,6 +281,9 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const toggleBranching = useCanvasStore((s) => s.toggleBranching);
   const canDisableBranching = useCanvasStore((s) => s.canDisableBranching);
+  // Subscribe to edges so this component re-renders when edges change,
+  // keeping the canDisableBranching() result fresh (e.g. after deleting a target node)
+  useCanvasStore((s) => s.edges);
   const config = questionTypeConfig[data.questionType];
 
   const addOption = useCallback(() => {
