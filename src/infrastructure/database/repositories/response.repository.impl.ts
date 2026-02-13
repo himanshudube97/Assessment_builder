@@ -3,7 +3,7 @@
  * Concrete implementation using Drizzle ORM
  */
 
-import { eq, desc, asc, sql, avg } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, avg } from 'drizzle-orm';
 import { getDatabase } from '../client';
 import { responses } from '../schema';
 import type {
@@ -94,7 +94,7 @@ export class ResponseRepository implements IResponseRepository {
         score: input.score ?? null,
         maxScore: input.maxScore ?? null,
         metadata: input.metadata,
-        startedAt: new Date(),
+        startedAt: input.startedAt ? new Date(input.startedAt) : new Date(),
         submittedAt: new Date(),
       })
       .returning();
@@ -177,6 +177,123 @@ export class ResponseRepository implements IResponseRepository {
     }
 
     return distribution;
+  }
+
+  async getResponseTimeline(
+    assessmentId: string,
+    days = 30
+  ): Promise<{ date: string; count: number }[]> {
+    const result = await this.db
+      .select({
+        date: sql<string>`to_char(${responses.submittedAt}::date, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(responses)
+      .where(
+        and(
+          eq(responses.assessmentId, assessmentId),
+          sql`${responses.submittedAt} >= now() - interval '1 day' * ${days}`
+        )
+      )
+      .groupBy(sql`${responses.submittedAt}::date`)
+      .orderBy(sql`${responses.submittedAt}::date`);
+
+    return result;
+  }
+
+  async getCompletionTimeStats(assessmentId: string): Promise<{
+    median: number | null;
+    average: number | null;
+    min: number | null;
+    max: number | null;
+  }> {
+    const result = await this.db
+      .select({
+        median: sql<number>`percentile_cont(0.5) within group (order by extract(epoch from (${responses.submittedAt} - ${responses.startedAt})))`,
+        average: sql<number>`avg(extract(epoch from (${responses.submittedAt} - ${responses.startedAt})))`,
+        min: sql<number>`min(extract(epoch from (${responses.submittedAt} - ${responses.startedAt})))`,
+        max: sql<number>`max(extract(epoch from (${responses.submittedAt} - ${responses.startedAt})))`,
+      })
+      .from(responses)
+      .where(
+        and(
+          eq(responses.assessmentId, assessmentId),
+          sql`extract(epoch from (${responses.submittedAt} - ${responses.startedAt})) > 5`
+        )
+      );
+
+    const row = result[0];
+    return {
+      median: row?.median ? Math.round(row.median) : null,
+      average: row?.average ? Math.round(row.average) : null,
+      min: row?.min ? Math.round(row.min) : null,
+      max: row?.max ? Math.round(row.max) : null,
+    };
+  }
+
+  async getScoreDistribution(
+    assessmentId: string,
+    bucketCount = 5
+  ): Promise<{ range: string; count: number }[]> {
+    const allScores = await this.db
+      .select({ score: responses.score, maxScore: responses.maxScore })
+      .from(responses)
+      .where(
+        and(
+          eq(responses.assessmentId, assessmentId),
+          sql`${responses.score} is not null`
+        )
+      );
+
+    if (allScores.length === 0) return [];
+
+    const maxScore = Math.max(...allScores.map((r) => r.maxScore ?? 0));
+    if (maxScore === 0) return [];
+
+    const bucketSize = Math.ceil(maxScore / bucketCount);
+    const buckets: { range: string; count: number }[] = [];
+
+    for (let i = 0; i < bucketCount; i++) {
+      const min = i * bucketSize;
+      const max = Math.min((i + 1) * bucketSize, maxScore);
+      const count = allScores.filter(
+        (r) =>
+          r.score !== null &&
+          r.score >= min &&
+          (i === bucketCount - 1 ? r.score <= max : r.score < max)
+      ).length;
+      buckets.push({ range: `${min}-${max}`, count });
+    }
+
+    return buckets;
+  }
+
+  async getResponsesForAnalytics(
+    assessmentId: string
+  ): Promise<
+    Pick<
+      Response,
+      'id' | 'answers' | 'metadata' | 'score' | 'maxScore' | 'startedAt' | 'submittedAt'
+    >[]
+  > {
+    const result = await this.db
+      .select()
+      .from(responses)
+      .where(eq(responses.assessmentId, assessmentId));
+
+    return result.map((r) => ({
+      id: r.id,
+      answers: (r.answers as Answer[]) || [],
+      metadata: (r.metadata as ResponseMetadata) || {
+        userAgent: '',
+        ipCountry: null,
+        referrer: null,
+      },
+      score: r.score,
+      maxScore: r.maxScore,
+      startedAt: r.startedAt,
+      submittedAt: r.submittedAt,
+    }));
   }
 }
 

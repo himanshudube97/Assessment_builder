@@ -60,52 +60,38 @@ Added iframe/popup embedding support and QR code generation in the share panel.
 
 ---
 
-## Phase 3: Invite-Only Mode — PLANNED (not started)
+## Phase 3: Invite-Only Mode — COMPLETE
 
-Allow assessments to be restricted to invited respondents only. The org invite system already exists (`/api/invites/`, `/invite/[token]`), and this phase extends it to assessment-level invitations.
+Added invite-only assessment access. Admins can toggle assessments to require unique invite tokens. Each token is trackable with usage limits.
 
-### Design Notes
+### What was built
 
-**Concept:** An admin can toggle an assessment to "Invite Only" mode. Instead of a public link, respondents receive unique invite tokens. Each token is single-use or limited-use.
+| Step | Description | Files |
+|------|-------------|-------|
+| 3.1 | **Schema** — `assessment_invites` table (id, assessmentId, email, token, maxUses, usedCount, expiresAt, createdAt) + `inviteOnly: boolean` in `AssessmentSettings` | `src/infrastructure/database/schema.ts`, `src/domain/entities/assessment.ts` |
+| 3.2 | **Domain entity** — `AssessmentInvite` interface, `isAssessmentInviteValid()`, reuses `generateInviteToken()` from org invite entity | `src/domain/entities/assessmentInvite.ts` (new) |
+| 3.3 | **Repository** — `IAssessmentInviteRepository` interface + Drizzle implementation with singleton factory. Methods: findById, findByToken, findByAssessmentId, create, createBulk, incrementUsedCount, delete, deleteByAssessmentId | `src/domain/repositories/assessmentInvite.repository.ts` (new), `src/infrastructure/database/repositories/assessmentInvite.repository.impl.ts` (new) |
+| 3.4 | **Invite CRUD API** — `POST/GET /api/assessments/:id/invites` (create bulk/list), `DELETE /api/assessments/:id/invites/:inviteId` (revoke). Supports email-based or anonymous link generation, capped at 100 per request | `src/app/api/assessments/[id]/invites/route.ts` (new), `src/app/api/assessments/[id]/invites/[inviteId]/route.ts` (new) |
+| 3.5 | **Public API gate** — validates `?invite=` token when `inviteOnly` is true; returns 403 with `requiresInvite` flag for missing/invalid/expired tokens | `src/app/api/public/assessments/[id]/route.ts` |
+| 3.6 | **Response API enforcement** — requires + validates invite token on submission; increments `usedCount` atomically via SQL `+1`; rejects exhausted/expired tokens | `src/app/api/assessments/[id]/responses/route.ts` |
+| 3.7 | **InviteRequiredState** — "Invitation Required" error page with Mail icon | `src/presentation/components/respondent/ErrorStates.tsx` |
+| 3.8 | **Respondent pages** — both `/a/[id]` and `/embed/[id]` read `?invite=` from URL, pass to public API, handle 403, pass token through AssessmentFlow to response submission. Wrapped in Suspense for `useSearchParams` | `src/app/a/[id]/page.tsx`, `src/app/embed/[id]/page.tsx`, `src/presentation/components/respondent/AssessmentFlow.tsx` |
+| 3.9 | **InviteManager UI** — toggle for invite-only (optimistic local state), create invites (anonymous links or email-based with configurable maxUses), invite list with copy link + usage stats + revoke. Shown in PublishModal for both draft and published states | `src/presentation/components/publish/InviteManager.tsx` (new), `src/presentation/components/publish/PublishModal.tsx` |
+| 3.10 | **Publish API** — accepts `inviteOnly` in settings update during publish | `src/app/api/assessments/[id]/publish/route.ts` |
+| 3.11 | **Share utility** — `getInviteShareUrl(assessmentId, token)` helper | `src/lib/share.ts` |
 
-### Proposed Steps
+### Prerequisites
 
-#### 3.1 — Schema: Assessment invites table
-- New table `assessment_invites` with columns: `id`, `assessmentId`, `email` (optional), `token` (unique), `maxUses`, `usedCount`, `expiresAt`, `createdAt`
-- Add `inviteOnly: boolean` to `AssessmentSettings`
-- Run schema migration with Drizzle
+- Run `npm run db:push` to create the `assessment_invites` table (migration file generated at `src/infrastructure/database/migrations/0001_gray_eternals.sql`)
 
-#### 3.2 — API: Create/list/revoke invites
-- `POST /api/assessments/[id]/invites` — generate invite(s), optionally with email addresses
-- `GET /api/assessments/[id]/invites` — list all invites with usage stats
-- `DELETE /api/assessments/[id]/invites/[inviteId]` — revoke an invite
+### How to test
 
-#### 3.3 — API: Validate invite token on public access
-- `GET /api/public/assessments/[id]?invite=[token]` — validate token, return assessment if valid
-- If `inviteOnly` is true and no valid token → return 403
-
-#### 3.4 — Response API: Enforce invite token
-- When submitting a response to an invite-only assessment, require the invite token
-- Increment `usedCount`, reject if over `maxUses`
-
-#### 3.5 — Respondent page: Invite token handling
-- Read `?invite=` query param from URL
-- If invite-only and no token → show "This assessment requires an invitation" state
-- Pass token through to response submission
-
-#### 3.6 — PublishModal: Invite management UI
-- Toggle for "Invite Only" mode in access control section
-- Invite creation form (bulk email input or generate anonymous links)
-- Invite list with copy link, usage stats, revoke button
-- Invite link format: `{baseUrl}/a/{assessmentId}?invite={token}`
-
-#### 3.7 — Email invites (optional, future)
-- Send invite emails via a transactional email service
-- Email contains the personalized assessment link
-
-### Existing code to leverage
-- Org-level invite system: `src/app/api/invites/[token]/`, `src/app/invite/[token]/page.tsx`
-- Can follow the same token-based pattern but scoped to assessments
+1. Toggle invite-only ON in PublishModal → publish → visit `/a/{id}` without token → "Invitation Required" page
+2. Generate invite links → copy one → open in incognito with `?invite=TOKEN` → assessment loads
+3. Submit response with invite token → `usedCount` increments → try again when exhausted → rejected
+4. Revoke an invite → try its link → should be rejected
+5. Same flow works via `/embed/{id}?invite=TOKEN`
+6. Toggle invite-only OFF → public link works again without token
 
 ---
 
@@ -129,19 +115,24 @@ These are ideas identified during the initial analysis that could be explored la
 | Area | File |
 |------|------|
 | Assessment entity & settings | `src/domain/entities/assessment.ts` |
+| Assessment invite entity | `src/domain/entities/assessmentInvite.ts` |
 | Flow validation | `src/domain/entities/flow.ts` (`validateFlow()`) |
 | Publish API | `src/app/api/assessments/[id]/publish/route.ts` |
 | Response submission API | `src/app/api/assessments/[id]/responses/route.ts` |
+| Invite CRUD API | `src/app/api/assessments/[id]/invites/route.ts` |
 | Public assessment API | `src/app/api/public/assessments/[id]/route.ts` |
 | Password verify API | `src/app/api/public/assessments/[id]/verify-password/route.ts` |
 | Share utilities | `src/lib/share.ts` |
 | PublishModal UI | `src/presentation/components/publish/PublishModal.tsx` |
+| InviteManager UI | `src/presentation/components/publish/InviteManager.tsx` |
 | Canvas store (Zustand) | `src/presentation/stores/canvas.store.ts` |
 | Editor page | `src/app/dashboard/[id]/edit/page.tsx` |
 | Public respondent page | `src/app/a/[id]/page.tsx` |
 | Embed page | `src/app/embed/[id]/page.tsx` |
 | Respondent components | `src/presentation/components/respondent/` |
 | Middleware (route protection) | `src/middleware.ts` |
+| Assessment invite repository | `src/infrastructure/database/repositories/assessmentInvite.repository.impl.ts` |
+| DB schema | `src/infrastructure/database/schema.ts` |
 
 ### Dependencies added
 - `qrcode.react` — QR code SVG/Canvas rendering (Phase 2)

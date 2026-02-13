@@ -479,7 +479,7 @@ export function PublishModal({
                         </label>
                         <div className="relative">
                           <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-32">
-                            {getPopupEmbedCode(assessmentId)}
+                            {getPopupEmbedCode(assessmentId, settings?.primaryColor)}
                           </pre>
                           <button
                             onClick={() => handleCopy(getPopupEmbedCode(assessmentId), 'popup')}

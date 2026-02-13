@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { CheckCircle } from 'lucide-react';
+import { hexWithAlpha, isLightColor, getFontFamilyCSS } from '@/lib/theme';
 
 interface SubmittedScreenProps {
   title?: string;
@@ -14,6 +14,9 @@ interface SubmittedScreenProps {
   showScore?: boolean;
   score?: number | null;
   maxScore?: number | null;
+  primaryColor?: string;
+  backgroundColor?: string;
+  fontFamily?: string;
 }
 
 export function SubmittedScreen({
@@ -22,9 +25,19 @@ export function SubmittedScreen({
   showScore = false,
   score = null,
   maxScore = null,
+  primaryColor = '#6366F1',
+  backgroundColor = '#f8fafc',
+  fontFamily = 'Geist Sans',
 }: SubmittedScreenProps) {
+  const lightBg = isLightColor(backgroundColor);
+  const textColor = lightBg ? '#0f172a' : '#f8fafc';
+  const mutedTextColor = lightBg ? '#64748b' : '#94a3b8';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor, fontFamily: getFontFamilyCSS(fontFamily) }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -34,13 +47,15 @@ export function SubmittedScreen({
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-          className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"
+          className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: hexWithAlpha(primaryColor, 0.12) }}
         >
           <motion.svg
-            className="w-10 h-10 text-emerald-600 dark:text-emerald-400"
+            className="w-10 h-10"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            style={{ color: primaryColor }}
           >
             <motion.path
               initial={{ pathLength: 0 }}
@@ -54,10 +69,10 @@ export function SubmittedScreen({
           </motion.svg>
         </motion.div>
 
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+        <h1 className="text-3xl font-bold mb-4" style={{ color: textColor }}>
           {title}
         </h1>
-        <p className="text-lg text-slate-600 dark:text-slate-400 mb-6">
+        <p className="text-lg mb-6" style={{ color: mutedTextColor }}>
           {description}
         </p>
 
@@ -66,7 +81,8 @@ export function SubmittedScreen({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-4xl font-bold text-indigo-600 dark:text-indigo-400"
+            className="text-4xl font-bold"
+            style={{ color: primaryColor }}
           >
             {score} / {maxScore}
           </motion.div>

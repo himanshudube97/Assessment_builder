@@ -34,13 +34,14 @@ export function getIframeEmbedCode(assessmentId: string): string {
 /**
  * Generate a popup embed snippet (button that opens assessment in a modal overlay)
  */
-export function getPopupEmbedCode(assessmentId: string): string {
+export function getPopupEmbedCode(assessmentId: string, primaryColor?: string): string {
   const embedUrl = getEmbedUrl(assessmentId);
+  const color = primaryColor || '#6366F1';
   return `<script>
 (function() {
   var btn = document.createElement('button');
   btn.textContent = 'Take Assessment';
-  btn.style.cssText = 'padding:12px 24px;background:#6366F1;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:system-ui,sans-serif;';
+  btn.style.cssText = 'padding:12px 24px;background:${color};color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px;font-family:system-ui,sans-serif;';
   btn.onclick = function() {
     var overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';

@@ -1,2 +1,9 @@
 export { StatsCard } from './StatsCard';
 export { AnswerChart } from './AnswerChart';
+export { ResponseTimeline } from './ResponseTimeline';
+export { ScoreHistogram } from './ScoreHistogram';
+export { NpsGauge } from './NpsGauge';
+export { DeviceChart } from './DeviceChart';
+export { SourceChart } from './SourceChart';
+export { ResponseTable } from './ResponseTable';
+export { CsvExportButton } from './CsvExportButton';

@@ -24,6 +24,7 @@ import {
 import { BaseNode } from './BaseNode';
 import type { QuestionNodeData, QuestionType } from '@/domain/entities/flow';
 import { cn } from '@/lib/utils';
+import { getDisplayText } from '@/lib/answerPiping';
 
 const questionTypeIcons: Record<QuestionType, React.ReactNode> = {
   multiple_choice_single: <CircleDot className="h-4 w-4" />,
@@ -105,7 +106,7 @@ export const QuestionNode = memo(function QuestionNode({
             !data.questionText && 'text-muted-foreground italic'
           )}
         >
-          {data.questionText || 'Enter your question...'}
+          {data.questionText ? getDisplayText(data.questionText) : 'Enter your question...'}
         </p>
 
         {/* Options preview for multiple choice */}

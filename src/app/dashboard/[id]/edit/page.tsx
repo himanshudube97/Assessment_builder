@@ -18,6 +18,7 @@ import {
   CloudOff,
   Pencil,
   Globe,
+  Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, canvasUndo, canvasRedo, canvasClearHistory } from '@/presentation/stores/canvas.store';
@@ -28,7 +29,9 @@ import {
 } from '@/presentation/components/canvas';
 import { PreviewModal } from '@/presentation/components/preview';
 import { PublishModal } from '@/presentation/components/publish';
+import { AppearanceModal } from '@/presentation/components/appearance';
 import type { PublishSettings } from '@/presentation/components/publish/PublishModal';
+import type { AssessmentSettings } from '@/domain/entities/assessment';
 import type { QuestionType } from '@/domain/entities/flow';
 
 interface EditorPageProps {
@@ -63,6 +66,7 @@ export default function EditorPage({ params }: EditorPageProps) {
     markSaved,
     setSaving,
     getFlowData,
+    updateSettings,
   } = useCanvasStore();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +75,7 @@ export default function EditorPage({ params }: EditorPageProps) {
   const [editableTitle, setEditableTitle] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
 
   // Load assessment on mount
   useEffect(() => {
@@ -215,6 +220,21 @@ export default function EditorPage({ params }: EditorPageProps) {
       throw err;
     }
   }, [id, setStatus]);
+
+  // Update appearance/theme settings
+  const handleSettingsChange = useCallback(async (themeSettings: Partial<AssessmentSettings>) => {
+    const response = await fetch(`/api/assessments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: themeSettings }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save appearance settings');
+    }
+
+    updateSettings(themeSettings);
+  }, [id, updateSettings]);
 
   // Handle title edit
   const handleTitleSubmit = useCallback(() => {
@@ -511,6 +531,19 @@ export default function EditorPage({ params }: EditorPageProps) {
             <span className="text-sm font-medium">Preview</span>
           </button>
 
+          {/* Appearance button */}
+          <button
+            onClick={() => setIsAppearanceOpen(true)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
+              'bg-muted text-muted-foreground',
+              'hover:bg-muted/80'
+            )}
+          >
+            <Palette className="h-4 w-4" />
+            <span className="text-sm font-medium">Appearance</span>
+          </button>
+
           {/* Publish button */}
           <button
             onClick={() => setIsPublishModalOpen(true)}
@@ -554,6 +587,15 @@ export default function EditorPage({ params }: EditorPageProps) {
         nodes={flowData.nodes}
         edges={flowData.edges}
         title={title}
+        settings={settings}
+      />
+
+      {/* Appearance Modal */}
+      <AppearanceModal
+        isOpen={isAppearanceOpen}
+        onClose={() => setIsAppearanceOpen(false)}
+        currentSettings={settings}
+        onApply={handleSettingsChange}
       />
 
       {/* Publish Modal */}

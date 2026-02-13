@@ -9,6 +9,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { hexWithAlpha, isLightColor, getFontFamilyCSS } from '@/lib/theme';
+import type { AssessmentSettings } from '@/domain/entities/assessment';
 import type {
   FlowNode,
   FlowEdge,
@@ -17,6 +19,7 @@ import type {
   EndNodeData,
   EdgeCondition,
 } from '@/domain/entities/flow';
+import { resolveAnswerPipes } from '@/lib/answerPiping';
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -24,6 +27,7 @@ interface PreviewModalProps {
   nodes: FlowNode[];
   edges: FlowEdge[];
   title: string;
+  settings?: AssessmentSettings | null;
 }
 
 type Answer = string | string[] | number;
@@ -34,7 +38,26 @@ export function PreviewModal({
   nodes,
   edges,
   title,
+  settings,
 }: PreviewModalProps) {
+  const color = settings?.primaryColor || '#6366F1';
+  const bgColor = settings?.backgroundColor || '#ffffff';
+  const radius = settings?.borderRadius || '12px';
+  const btnStyle = settings?.buttonStyle || 'filled';
+  const fontFamily = settings?.fontFamily || 'Geist Sans';
+  const lightBg = isLightColor(bgColor);
+  const previewTextColor = lightBg ? '#0f172a' : '#f8fafc';
+  const previewMutedColor = lightBg ? '#64748b' : '#94a3b8';
+  const previewBorder = lightBg ? '#e2e8f0' : '#334155';
+  const previewCardBg = lightBg ? '#ffffff' : '#1e293b';
+
+  const getThemedButtonStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = { borderRadius: btnStyle === 'pill' ? '9999px' : radius };
+    if (btnStyle === 'outline') {
+      return { ...base, backgroundColor: 'transparent', border: `2px solid ${color}`, color };
+    }
+    return { ...base, backgroundColor: color, color: '#ffffff' };
+  };
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [history, setHistory] = useState<string[]>([]);
@@ -62,7 +85,7 @@ export function PreviewModal({
       ? Math.round((answeredCount / questionNodes.length) * 100)
       : 0;
 
-  // Find next node based on conditions
+  // Find next node based on conditions and per-option branching
   const findNextNode = useCallback(
     (fromNodeId: string, answer?: Answer): FlowNode | null => {
       const outgoingEdges = edges.filter((e) => e.source === fromNodeId);
@@ -83,8 +106,34 @@ export function PreviewModal({
         }
       }
 
-      // Fall back to edge without condition
-      const defaultEdge = outgoingEdges.find((e) => !e.condition);
+      // Per-option branching: match answer to sourceHandle
+      if (answer !== undefined) {
+        const handleEdges = outgoingEdges.filter((e) => e.sourceHandle);
+        if (handleEdges.length > 0) {
+          const sourceNode = nodes.find((n) => n.id === fromNodeId);
+          if (sourceNode?.type === 'question') {
+            const data = sourceNode.data as QuestionNodeData;
+            if (data.options) {
+              const matchedOption = data.options.find(
+                (opt) => opt.text === String(answer)
+              );
+              if (matchedOption) {
+                const matchedEdge = handleEdges.find(
+                  (e) => e.sourceHandle === matchedOption.id
+                );
+                if (matchedEdge) {
+                  return nodes.find((n) => n.id === matchedEdge.target) || null;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fall back to edge without condition (default path)
+      const defaultEdge = outgoingEdges.find(
+        (e) => !e.condition && !e.sourceHandle
+      );
       if (defaultEdge) {
         return nodes.find((n) => n.id === defaultEdge.target) || null;
       }
@@ -187,9 +236,10 @@ export function PreviewModal({
 
           {/* Progress bar */}
           {currentNode?.type === 'question' && (
-            <div className="h-1 bg-muted">
+            <div className="h-1" style={{ backgroundColor: hexWithAlpha(color, 0.15) }}>
               <motion.div
-                className="h-full bg-primary"
+                className="h-full"
+                style={{ backgroundColor: color }}
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.3 }}
@@ -198,13 +248,23 @@ export function PreviewModal({
           )}
 
           {/* Content */}
-          <div className="p-8 min-h-[400px] flex flex-col">
+          <div
+            className="p-8 min-h-[400px] flex flex-col"
+            style={{
+              backgroundColor: bgColor,
+              fontFamily: getFontFamilyCSS(fontFamily),
+              color: previewTextColor,
+            }}
+          >
             <AnimatePresence mode="wait">
               {!currentNode || currentNode.type === 'start' ? (
                 <StartScreen
                   key="start"
                   data={startNode?.data as StartNodeData}
                   onStart={handleStart}
+                  buttonStyle={getThemedButtonStyle()}
+                  textColor={previewTextColor}
+                  mutedColor={previewMutedColor}
                 />
               ) : currentNode.type === 'question' ? (
                 <QuestionScreen
@@ -212,12 +272,23 @@ export function PreviewModal({
                   data={currentNode.data as QuestionNodeData}
                   answer={answers[currentNode.id]}
                   onAnswer={handleAnswer}
+                  allAnswers={answers}
+                  nodes={nodes}
+                  primaryColor={color}
+                  textColor={previewTextColor}
+                  mutedColor={previewMutedColor}
+                  borderRadius={radius}
+                  cardBg={previewCardBg}
+                  cardBorder={previewBorder}
                 />
               ) : currentNode.type === 'end' ? (
                 <EndScreen
                   key="end"
                   data={currentNode.data as EndNodeData}
                   score={null}
+                  primaryColor={color}
+                  textColor={previewTextColor}
+                  mutedColor={previewMutedColor}
                 />
               ) : null}
             </AnimatePresence>
@@ -244,12 +315,8 @@ export function PreviewModal({
                   (currentNode.data as QuestionNodeData).required &&
                   !answers[currentNode.id]
                 }
-                className={cn(
-                  'flex items-center gap-2 px-6 py-2 rounded-lg transition-all',
-                  'bg-primary text-primary-foreground',
-                  'hover:bg-primary/90',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
-                )}
+                className="flex items-center gap-2 px-6 py-2 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={getThemedButtonStyle()}
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
@@ -294,9 +361,15 @@ function evaluateCondition(condition: EdgeCondition, answer: Answer): boolean {
 function StartScreen({
   data,
   onStart,
+  buttonStyle,
+  textColor,
+  mutedColor,
 }: {
   data?: StartNodeData;
   onStart: () => void;
+  buttonStyle: React.CSSProperties;
+  textColor: string;
+  mutedColor: string;
 }) {
   if (!data) return null;
 
@@ -307,19 +380,16 @@ function StartScreen({
       exit={{ opacity: 0, y: -20 }}
       className="flex-1 flex flex-col items-center justify-center text-center"
     >
-      <h1 className="text-3xl font-bold text-foreground mb-4">{data.title}</h1>
+      <h1 className="text-3xl font-bold mb-4" style={{ color: textColor }}>{data.title}</h1>
       {data.description && (
-        <p className="text-lg text-muted-foreground mb-8 max-w-md">
+        <p className="text-lg mb-8 max-w-md" style={{ color: mutedColor }}>
           {data.description}
         </p>
       )}
       <button
         onClick={onStart}
-        className={cn(
-          'px-8 py-3 rounded-xl text-lg font-medium transition-all',
-          'bg-primary text-primary-foreground',
-          'hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5'
-        )}
+        className="px-8 py-3 text-lg font-medium transition-all hover:shadow-lg hover:-translate-y-0.5"
+        style={buttonStyle}
       >
         {data.buttonText}
       </button>
@@ -332,11 +402,49 @@ function QuestionScreen({
   data,
   answer,
   onAnswer,
+  allAnswers,
+  nodes,
+  primaryColor,
+  textColor,
+  mutedColor,
+  borderRadius,
+  cardBg,
+  cardBorder,
 }: {
   data: QuestionNodeData;
   answer?: Answer;
   onAnswer: (answer: Answer) => void;
+  allAnswers: Record<string, Answer>;
+  nodes: FlowNode[];
+  primaryColor: string;
+  textColor: string;
+  mutedColor: string;
+  borderRadius: string;
+  cardBg: string;
+  cardBorder: string;
 }) {
+  const resolvedText = useMemo(
+    () => resolveAnswerPipes(data.questionText, allAnswers),
+    [data.questionText, allAnswers]
+  );
+
+  const optionStyle = (isSelected: boolean): React.CSSProperties => ({
+    borderRadius,
+    borderColor: isSelected ? primaryColor : cardBorder,
+    backgroundColor: isSelected ? hexWithAlpha(primaryColor, 0.08) : cardBg,
+    borderWidth: '2px',
+  });
+
+  const inputStyle = (hasValue: boolean): React.CSSProperties => ({
+    borderRadius,
+    borderColor: hasValue ? primaryColor : cardBorder,
+    backgroundColor: cardBg,
+    color: textColor,
+    borderWidth: '2px',
+  });
+
+  const unselectedBtnBg = hexWithAlpha(textColor, 0.06);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -344,11 +452,11 @@ function QuestionScreen({
       exit={{ opacity: 0, y: -20 }}
       className="flex-1"
     >
-      <h2 className="text-2xl font-semibold text-foreground mb-2">
-        {data.questionText}
+      <h2 className="text-2xl font-semibold mb-2" style={{ color: textColor }}>
+        {resolvedText}
       </h2>
       {data.description && (
-        <p className="text-muted-foreground mb-6">{data.description}</p>
+        <p className="mb-6" style={{ color: mutedColor }}>{data.description}</p>
       )}
 
       <div className="mt-6 space-y-3">
@@ -359,27 +467,22 @@ function QuestionScreen({
             <button
               key={option.id}
               onClick={() => onAnswer(option.text)}
-              className={cn(
-                'w-full p-4 rounded-xl border-2 text-left transition-all',
-                answer === option.text
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:border-primary/50'
-              )}
+              className="w-full p-4 text-left transition-all border-solid"
+              style={optionStyle(answer === option.text)}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={cn(
-                    'w-5 h-5 rounded-full border-2 flex items-center justify-center',
-                    answer === option.text
-                      ? 'border-primary bg-primary'
-                      : 'border-muted-foreground'
-                  )}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                  style={{
+                    borderColor: answer === option.text ? primaryColor : cardBorder,
+                    backgroundColor: answer === option.text ? primaryColor : undefined,
+                  }}
                 >
                   {answer === option.text && (
                     <div className="w-2 h-2 rounded-full bg-white" />
                   )}
                 </div>
-                <span className="text-foreground">{option.text}</span>
+                <span style={{ color: textColor }}>{option.text}</span>
               </div>
             </button>
           ))}
@@ -399,21 +502,16 @@ function QuestionScreen({
                     onAnswer([...current, option.text]);
                   }
                 }}
-                className={cn(
-                  'w-full p-4 rounded-xl border-2 text-left transition-all',
-                  selected
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                )}
+                className="w-full p-4 text-left transition-all border-solid"
+                style={optionStyle(selected)}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={cn(
-                      'w-5 h-5 rounded border-2 flex items-center justify-center',
-                      selected
-                        ? 'border-primary bg-primary'
-                        : 'border-muted-foreground'
-                    )}
+                    className="w-5 h-5 rounded border-2 flex items-center justify-center"
+                    style={{
+                      borderColor: selected ? primaryColor : cardBorder,
+                      backgroundColor: selected ? primaryColor : undefined,
+                    }}
                   >
                     {selected && (
                       <svg
@@ -431,7 +529,7 @@ function QuestionScreen({
                       </svg>
                     )}
                   </div>
-                  <span className="text-foreground">{option.text}</span>
+                  <span style={{ color: textColor }}>{option.text}</span>
                 </div>
               </button>
             );
@@ -448,12 +546,13 @@ function QuestionScreen({
                     <button
                       key={value}
                       onClick={() => onAnswer(value)}
-                      className={cn(
-                        'w-12 h-12 rounded-xl font-semibold transition-all',
-                        answer === value
-                          ? 'bg-primary text-primary-foreground scale-110'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      )}
+                      className="w-12 h-12 font-semibold transition-all"
+                      style={{
+                        borderRadius,
+                        backgroundColor: answer === value ? primaryColor : unselectedBtnBg,
+                        color: answer === value ? '#ffffff' : mutedColor,
+                        transform: answer === value ? 'scale(1.1)' : undefined,
+                      }}
                     >
                       {value}
                     </button>
@@ -461,7 +560,7 @@ function QuestionScreen({
                 }
               )}
             </div>
-            <div className="flex justify-between w-full text-sm text-muted-foreground">
+            <div className="flex justify-between w-full text-sm" style={{ color: mutedColor }}>
               <span>{data.minLabel}</span>
               <span>{data.maxLabel}</span>
             </div>
@@ -476,7 +575,8 @@ function QuestionScreen({
             onChange={(e) => onAnswer(e.target.value)}
             placeholder={data.placeholder}
             maxLength={data.maxLength}
-            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -488,7 +588,8 @@ function QuestionScreen({
             placeholder={data.placeholder}
             maxLength={data.maxLength}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors resize-none"
+            className="w-full px-4 py-3 focus:outline-none transition-colors resize-none"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -501,7 +602,8 @@ function QuestionScreen({
             placeholder={data.placeholder}
             min={data.minValue}
             max={data.maxValue}
-            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(answer !== undefined && answer !== '')}
           />
         )}
 
@@ -512,7 +614,8 @@ function QuestionScreen({
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
             placeholder={data.placeholder || 'you@example.com'}
-            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -521,10 +624,8 @@ function QuestionScreen({
           <select
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
-            className={cn(
-              'w-full px-4 py-3 rounded-xl border-2 bg-background focus:outline-none transition-colors',
-              answer ? 'border-primary' : 'border-border'
-            )}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           >
             <option value="">Select an option...</option>
             {data.options.map((option) => (
@@ -541,10 +642,8 @@ function QuestionScreen({
             type="date"
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
-            className={cn(
-              'w-full px-4 py-3 rounded-xl border-2 bg-background focus:outline-none transition-colors',
-              answer ? 'border-primary' : 'border-border'
-            )}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -556,21 +655,22 @@ function QuestionScreen({
                 <button
                   key={i}
                   onClick={() => onAnswer(i)}
-                  className={cn(
-                    'w-10 h-10 rounded-lg font-semibold text-sm transition-all',
-                    answer === i
-                      ? 'text-white scale-110'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                    answer === i && i <= 6 && 'bg-red-500',
-                    answer === i && i >= 7 && i <= 8 && 'bg-yellow-500',
-                    answer === i && i >= 9 && 'bg-green-500'
-                  )}
+                  className="w-10 h-10 font-semibold text-sm transition-all"
+                  style={{
+                    borderRadius: `calc(${borderRadius} * 0.6)`,
+                    backgroundColor:
+                      answer === i
+                        ? i <= 6 ? '#EF4444' : i <= 8 ? '#EAB308' : '#22C55E'
+                        : unselectedBtnBg,
+                    color: answer === i ? '#ffffff' : mutedColor,
+                    transform: answer === i ? 'scale(1.1)' : undefined,
+                  }}
                 >
                   {i}
                 </button>
               ))}
             </div>
-            <div className="flex justify-between w-full text-sm text-muted-foreground">
+            <div className="flex justify-between w-full text-sm" style={{ color: mutedColor }}>
               <span>{data.minLabel || 'Not likely'}</span>
               <span>{data.maxLabel || 'Very likely'}</span>
             </div>
@@ -585,9 +685,15 @@ function QuestionScreen({
 function EndScreen({
   data,
   score,
+  primaryColor,
+  textColor,
+  mutedColor,
 }: {
   data: EndNodeData;
   score: { score: number; maxScore: number } | null;
+  primaryColor: string;
+  textColor: string;
+  mutedColor: string;
 }) {
   return (
     <motion.div
@@ -601,13 +707,15 @@ function EndScreen({
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
-          className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"
+          className="w-20 h-20 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: hexWithAlpha(primaryColor, 0.12) }}
         >
           <svg
-            className="w-10 h-10 text-emerald-600 dark:text-emerald-400"
+            className="w-10 h-10"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            style={{ color: primaryColor }}
           >
             <motion.path
               initial={{ pathLength: 0 }}
@@ -622,15 +730,15 @@ function EndScreen({
         </motion.div>
       </div>
 
-      <h1 className="text-3xl font-bold text-foreground mb-4">{data.title}</h1>
+      <h1 className="text-3xl font-bold mb-4" style={{ color: textColor }}>{data.title}</h1>
       {data.description && (
-        <p className="text-lg text-muted-foreground mb-6 max-w-md">
+        <p className="text-lg mb-6 max-w-md" style={{ color: mutedColor }}>
           {data.description}
         </p>
       )}
 
       {data.showScore && score && (
-        <div className="text-4xl font-bold text-primary mb-4">
+        <div className="text-4xl font-bold mb-4" style={{ color: primaryColor }}>
           {score.score} / {score.maxScore}
         </div>
       )}

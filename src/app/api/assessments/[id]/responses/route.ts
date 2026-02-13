@@ -113,6 +113,7 @@ export async function POST(
       answers: body.answers || [],
       score: body.score ?? null,
       maxScore: body.maxScore ?? null,
+      startedAt: body.startedAt || undefined,
       metadata: body.metadata || {
         userAgent: request.headers.get('user-agent') || '',
         ipCountry: null,

@@ -31,6 +31,7 @@ export interface CreateResponseInput {
   answers: Answer[];
   score?: number | null;
   maxScore?: number | null;
+  startedAt?: string;
   metadata: ResponseMetadata;
 }
 

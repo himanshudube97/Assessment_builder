@@ -29,6 +29,10 @@ interface PublicAssessment {
     showProgressBar?: boolean;
     allowBackNavigation?: boolean;
     scoringEnabled?: boolean;
+    fontFamily?: string;
+    borderRadius?: string;
+    buttonStyle?: string;
+    cardStyle?: string;
   };
   status: string;
   isOpen: boolean;
@@ -158,6 +162,8 @@ function PublicAssessmentContent({ params }: PageProps) {
         assessmentId={assessment.id}
         title={assessment.title}
         onVerified={handlePasswordVerified}
+        primaryColor={assessment.settings.primaryColor}
+        backgroundColor={assessment.settings.backgroundColor}
       />
     );
   }

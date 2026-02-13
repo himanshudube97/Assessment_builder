@@ -9,18 +9,34 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isLightColor, hexWithAlpha } from '@/lib/theme';
 
 interface PasswordGateProps {
   assessmentId: string;
   title: string;
   onVerified: () => void;
+  primaryColor?: string;
+  backgroundColor?: string;
 }
 
-export function PasswordGate({ assessmentId, title, onVerified }: PasswordGateProps) {
+export function PasswordGate({
+  assessmentId,
+  title,
+  onVerified,
+  primaryColor = '#6366F1',
+  backgroundColor = '#f8fafc',
+}: PasswordGateProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const lightBg = isLightColor(backgroundColor);
+  const textColor = lightBg ? '#0f172a' : '#f8fafc';
+  const mutedTextColor = lightBg ? '#64748b' : '#94a3b8';
+  const inputBg = lightBg ? '#ffffff' : '#1e293b';
+  const inputBorder = lightBg ? '#e2e8f0' : '#334155';
+  const iconBg = hexWithAlpha(primaryColor, 0.1);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +73,10 @@ export function PasswordGate({ assessmentId, title, onVerified }: PasswordGatePr
   }, [assessmentId, password, onVerified]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -68,14 +87,15 @@ export function PasswordGate({ assessmentId, title, onVerified }: PasswordGatePr
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-            className="w-20 h-20 mx-auto mb-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+            className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: iconBg }}
           >
-            <Lock className="h-10 w-10 text-slate-400" />
+            <Lock className="h-10 w-10" style={{ color: primaryColor }} />
           </motion.div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+          <h1 className="text-2xl font-bold mb-2" style={{ color: textColor }}>
             Password Required
           </h1>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p style={{ color: mutedTextColor }}>
             Enter the password to access <span className="font-medium">{title}</span>
           </p>
         </div>
@@ -88,18 +108,20 @@ export function PasswordGate({ assessmentId, title, onVerified }: PasswordGatePr
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
               autoFocus
-              className={cn(
-                'w-full px-4 py-3 pr-12 rounded-lg border bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100',
-                'focus:outline-none focus:ring-2 focus:ring-indigo-500',
-                error
-                  ? 'border-red-300 dark:border-red-700'
-                  : 'border-slate-200 dark:border-slate-700'
-              )}
+              className="w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: inputBg,
+                color: textColor,
+                borderColor: error ? '#EF4444' : inputBorder,
+                // @ts-expect-error CSS custom property for focus ring
+                '--tw-ring-color': primaryColor,
+              }}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+              style={{ color: mutedTextColor }}
             >
               {showPassword ? (
                 <EyeOff className="h-5 w-5" />
@@ -113,7 +135,7 @@ export function PasswordGate({ assessmentId, title, onVerified }: PasswordGatePr
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"
+              className="flex items-center gap-2 text-sm text-red-500"
             >
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               {error}
@@ -125,9 +147,9 @@ export function PasswordGate({ assessmentId, title, onVerified }: PasswordGatePr
             disabled={isVerifying}
             className={cn(
               'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all',
-              'bg-indigo-600 text-white hover:bg-indigo-700',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
+              'text-white disabled:opacity-50 disabled:cursor-not-allowed'
             )}
+            style={{ backgroundColor: primaryColor }}
           >
             {isVerifying ? (
               <Loader2 className="h-5 w-5 animate-spin" />

@@ -134,6 +134,9 @@ interface CanvasState {
   // Handle internals update
   clearNodeToUpdateInternals: () => void;
 
+  // Settings
+  updateSettings: (partial: Partial<AssessmentSettings>) => void;
+
   // Reset
   reset: () => void;
 }
@@ -501,6 +504,12 @@ export const useCanvasStore = create<CanvasState>()(
 
           clearNodeToUpdateInternals: () => {
             set({ nodeToUpdateInternals: null });
+          },
+
+          updateSettings: (partial) => {
+            set((state) => ({
+              settings: state.settings ? { ...state.settings, ...partial } : null,
+            }));
           },
 
           reset: () => set(initialState),

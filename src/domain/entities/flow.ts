@@ -3,6 +3,8 @@
  * Represents the visual flow of an assessment (nodes and connections)
  */
 
+import { findBrokenPipeReferences } from '@/lib/answerPiping';
+
 // ===========================================
 // Node Types
 // ===========================================
@@ -326,6 +328,22 @@ export function validateFlow(
           type: 'error',
           nodeId: node.id,
           message: 'Question text cannot be empty',
+        });
+      }
+    });
+
+  // Check for broken answer pipe references (referencing deleted questions)
+  const existingNodeIds = new Set(nodes.map((n) => n.id));
+  nodes
+    .filter((n) => n.type === 'question')
+    .forEach((node) => {
+      const data = node.data as QuestionNodeData;
+      const broken = findBrokenPipeReferences(data.questionText, existingNodeIds);
+      if (broken.length > 0) {
+        errors.push({
+          type: 'warning',
+          nodeId: node.id,
+          message: `Question references ${broken.length} deleted question(s) — piped answers will show fallback text`,
         });
       }
     });

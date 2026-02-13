@@ -9,6 +9,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { hexWithAlpha, isLightColor, getCardClasses, getFontFamilyCSS } from '@/lib/theme';
+import { ThemeFontLoader } from './ThemeFontLoader';
 import { SubmittedScreen } from './SubmittedScreen';
 import type {
   FlowNode,
@@ -19,6 +21,7 @@ import type {
   EdgeCondition,
 } from '@/domain/entities/flow';
 import type { Answer as AnswerEntity } from '@/domain/entities/response';
+import { resolveAnswerPipes } from '@/lib/answerPiping';
 
 interface AssessmentFlowProps {
   assessmentId: string;
@@ -31,6 +34,10 @@ interface AssessmentFlowProps {
     showProgressBar?: boolean;
     allowBackNavigation?: boolean;
     scoringEnabled?: boolean;
+    fontFamily?: string;
+    borderRadius?: string;
+    buttonStyle?: string;
+    cardStyle?: string;
   };
   isEmbed?: boolean;
   inviteToken?: string | null;
@@ -174,7 +181,7 @@ export function AssessmentFlow({
     []
   );
 
-  // Find next node based on conditions
+  // Find next node based on conditions and per-option branching
   const findNextNode = useCallback(
     (fromNodeId: string, answer?: AnswerValue): FlowNode | null => {
       const outgoingEdges = edges.filter((e) => e.source === fromNodeId);
@@ -195,8 +202,35 @@ export function AssessmentFlow({
         }
       }
 
-      // Fall back to edge without condition
-      const defaultEdge = outgoingEdges.find((e) => !e.condition);
+      // Per-option branching: match answer to sourceHandle
+      // (yes/no and MCQ with branching use sourceHandle = option.id)
+      if (answer !== undefined) {
+        const handleEdges = outgoingEdges.filter((e) => e.sourceHandle);
+        if (handleEdges.length > 0) {
+          const sourceNode = nodes.find((n) => n.id === fromNodeId);
+          if (sourceNode?.type === 'question') {
+            const data = sourceNode.data as QuestionNodeData;
+            if (data.options) {
+              const matchedOption = data.options.find(
+                (opt) => opt.text === String(answer)
+              );
+              if (matchedOption) {
+                const matchedEdge = handleEdges.find(
+                  (e) => e.sourceHandle === matchedOption.id
+                );
+                if (matchedEdge) {
+                  return nodes.find((n) => n.id === matchedEdge.target) || null;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fall back to edge without condition (default path)
+      const defaultEdge = outgoingEdges.find(
+        (e) => !e.condition && !e.sourceHandle
+      );
       if (defaultEdge) {
         return nodes.find((n) => n.id === defaultEdge.target) || null;
       }
@@ -231,14 +265,15 @@ export function AssessmentFlow({
     setIsSubmitting(true);
 
     try {
-      // Build answers array
+      // Build answers array (resolve piped variables so exports show actual text)
       const answerEntities: AnswerEntity[] = Object.entries(answers).map(
         ([nodeId, value]) => {
           const node = nodes.find((n) => n.id === nodeId);
-          const questionText =
+          const rawText =
             node?.type === 'question'
               ? (node.data as QuestionNodeData).questionText
               : '';
+          const questionText = resolveAnswerPipes(rawText, answers);
           return {
             nodeId,
             questionText,
@@ -253,6 +288,7 @@ export function AssessmentFlow({
         body: JSON.stringify({
           answers: answerEntities,
           inviteToken: inviteToken || undefined,
+          startedAt,
           metadata: {
             userAgent: navigator.userAgent,
             ipCountry: null,
@@ -311,112 +347,156 @@ export function AssessmentFlow({
     setCurrentNodeId(prevId === startNode?.id ? null : prevId);
   }, [history, startNode?.id, settings.allowBackNavigation]);
 
+  // Derive theme values
+  const color = settings.primaryColor || '#6366F1';
+  const bgColor = settings.backgroundColor || '#f8fafc';
+  const radius = settings.borderRadius || '12px';
+  const btnStyle = settings.buttonStyle || 'filled';
+  const cardStyle = settings.cardStyle || 'bordered';
+  const fontFamily = settings.fontFamily || 'Geist Sans';
+  const lightBg = isLightColor(bgColor);
+  const textColor = lightBg ? '#0f172a' : '#f8fafc';
+  const mutedTextColor = lightBg ? '#64748b' : '#94a3b8';
+  const cardBg = lightBg ? '#ffffff' : '#1e293b';
+  const cardBorder = lightBg ? '#e2e8f0' : '#334155';
+  const footerBg = lightBg ? '#ffffff' : '#0f172a';
+  const footerBorder = lightBg ? '#e2e8f0' : '#1e293b';
+
+  // Button style helpers
+  const getNextButtonStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = { borderRadius: btnStyle === 'pill' ? '9999px' : radius };
+    if (btnStyle === 'outline') {
+      return { ...base, backgroundColor: 'transparent', border: `2px solid ${color}`, color };
+    }
+    return { ...base, backgroundColor: color, color: '#ffffff' };
+  };
+
+  const getStartButtonStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = { borderRadius: btnStyle === 'pill' ? '9999px' : radius };
+    if (btnStyle === 'outline') {
+      return { ...base, backgroundColor: 'transparent', border: `2px solid ${color}`, color };
+    }
+    return { ...base, backgroundColor: color, color: '#ffffff' };
+  };
+
   // If submitted, show submitted screen
   if (isSubmitted) {
     return (
-      <SubmittedScreen
-        title={endNodeData?.title}
-        description={endNodeData?.description}
-        showScore={endNodeData?.showScore}
-        score={score?.score}
-        maxScore={score?.maxScore}
-      />
+      <ThemeFontLoader fontFamily={fontFamily}>
+        <SubmittedScreen
+          title={endNodeData?.title}
+          description={endNodeData?.description}
+          showScore={endNodeData?.showScore}
+          score={score?.score}
+          maxScore={score?.maxScore}
+        />
+      </ThemeFontLoader>
     );
   }
 
   return (
-    <div
-      className={cn(isEmbed ? 'h-screen' : 'min-h-screen', 'flex flex-col')}
-      style={{ backgroundColor: settings.backgroundColor || '#f8fafc' }}
-    >
-      {/* Progress bar */}
-      {settings.showProgressBar && currentNode?.type === 'question' && (
-        <div className="h-1 bg-slate-200 dark:bg-slate-800">
-          <motion.div
-            className="h-full"
-            style={{ backgroundColor: settings.primaryColor || '#6366F1' }}
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-      )}
+    <ThemeFontLoader fontFamily={fontFamily}>
+      <div
+        className={cn(isEmbed ? 'h-screen' : 'min-h-screen', 'flex flex-col')}
+        style={{
+          backgroundColor: bgColor,
+          fontFamily: getFontFamilyCSS(fontFamily),
+          color: textColor,
+        }}
+      >
+        {/* Progress bar */}
+        {settings.showProgressBar && currentNode?.type === 'question' && (
+          <div className="h-1" style={{ backgroundColor: hexWithAlpha(color, 0.15) }}>
+            <motion.div
+              className="h-full"
+              style={{ backgroundColor: color }}
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        )}
 
-      {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl">
-          <AnimatePresence mode="wait">
-            {!currentNode || currentNode.type === 'start' ? (
-              <StartScreen
-                key="start"
-                data={startNode?.data as StartNodeData}
-                onStart={handleStart}
-                primaryColor={settings.primaryColor}
-              />
-            ) : currentNode.type === 'question' ? (
-              <QuestionScreen
-                key={currentNode.id}
-                data={currentNode.data as QuestionNodeData}
-                answer={answers[currentNode.id]}
-                onAnswer={handleAnswer}
-                primaryColor={settings.primaryColor}
-              />
-            ) : currentNode.type === 'end' ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                <p className="mt-4 text-slate-500">Submitting your response...</p>
-              </div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Footer navigation */}
-      {currentNode?.type === 'question' && (
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-            {settings.allowBackNavigation ? (
-              <button
-                onClick={handleBack}
-                disabled={history.length === 0}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
-                  'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
-                )}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
-            <button
-              onClick={handleNext}
-              disabled={
-                ((currentNode.data as QuestionNodeData).required &&
-                  !answers[currentNode.id]) ||
-                isSubmitting
-              }
-              className={cn(
-                'flex items-center gap-2 px-6 py-2 rounded-lg transition-all',
-                'text-white disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-              style={{ backgroundColor: settings.primaryColor || '#6366F1' }}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
+        {/* Content */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <AnimatePresence mode="wait">
+              {!currentNode || currentNode.type === 'start' ? (
+                <StartScreen
+                  key="start"
+                  data={startNode?.data as StartNodeData}
+                  onStart={handleStart}
+                  primaryColor={color}
+                  textColor={textColor}
+                  mutedTextColor={mutedTextColor}
+                  buttonStyle={getStartButtonStyle()}
+                />
+              ) : currentNode.type === 'question' ? (
+                <QuestionScreen
+                  key={currentNode.id}
+                  data={currentNode.data as QuestionNodeData}
+                  answer={answers[currentNode.id]}
+                  onAnswer={handleAnswer}
+                  primaryColor={color}
+                  textColor={textColor}
+                  mutedTextColor={mutedTextColor}
+                  borderRadius={radius}
+                  cardStyle={cardStyle}
+                  cardBg={cardBg}
+                  cardBorder={cardBorder}
+                  allAnswers={answers}
+                />
+              ) : currentNode.type === 'end' ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin" style={{ color: mutedTextColor }} />
+                  <p className="mt-4" style={{ color: mutedTextColor }}>Submitting your response...</p>
+                </div>
+              ) : null}
+            </AnimatePresence>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Footer navigation */}
+        {currentNode?.type === 'question' && (
+          <div style={{ borderTop: `1px solid ${footerBorder}`, backgroundColor: footerBg }}>
+            <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+              {settings.allowBackNavigation ? (
+                <button
+                  onClick={handleBack}
+                  disabled={history.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ color: mutedTextColor, borderRadius: radius }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </button>
+              ) : (
+                <div />
+              )}
+              <button
+                onClick={handleNext}
+                disabled={
+                  ((currentNode.data as QuestionNodeData).required &&
+                    !answers[currentNode.id]) ||
+                  isSubmitting
+                }
+                className="flex items-center gap-2 px-6 py-2 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={getNextButtonStyle()}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ThemeFontLoader>
   );
 }
 
@@ -425,10 +505,16 @@ function StartScreen({
   data,
   onStart,
   primaryColor,
+  textColor,
+  mutedTextColor,
+  buttonStyle,
 }: {
   data?: StartNodeData;
   onStart: () => void;
-  primaryColor?: string;
+  primaryColor: string;
+  textColor: string;
+  mutedTextColor: string;
+  buttonStyle: React.CSSProperties;
 }) {
   if (!data) return null;
 
@@ -439,18 +525,18 @@ function StartScreen({
       exit={{ opacity: 0, y: -20 }}
       className="text-center py-12"
     >
-      <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+      <h1 className="text-4xl font-bold mb-4" style={{ color: textColor }}>
         {data.title}
       </h1>
       {data.description && (
-        <p className="text-lg text-slate-600 dark:text-slate-400 mb-8 max-w-md mx-auto">
+        <p className="text-lg mb-8 max-w-md mx-auto" style={{ color: mutedTextColor }}>
           {data.description}
         </p>
       )}
       <button
         onClick={onStart}
-        className="px-8 py-3 rounded-xl text-lg font-medium text-white transition-all hover:shadow-lg hover:-translate-y-0.5"
-        style={{ backgroundColor: primaryColor || '#6366F1' }}
+        className="px-8 py-3 text-lg font-medium transition-all hover:shadow-lg hover:-translate-y-0.5"
+        style={buttonStyle}
       >
         {data.buttonText}
       </button>
@@ -464,13 +550,49 @@ function QuestionScreen({
   answer,
   onAnswer,
   primaryColor,
+  textColor,
+  mutedTextColor,
+  borderRadius,
+  cardStyle,
+  cardBg,
+  cardBorder,
+  allAnswers,
 }: {
   data: QuestionNodeData;
   answer?: AnswerValue;
   onAnswer: (answer: AnswerValue) => void;
-  primaryColor?: string;
+  primaryColor: string;
+  textColor: string;
+  mutedTextColor: string;
+  borderRadius: string;
+  cardStyle: string;
+  cardBg: string;
+  cardBorder: string;
+  allAnswers: Record<string, AnswerValue>;
 }) {
-  const color = primaryColor || '#6366F1';
+  const color = primaryColor;
+  const resolvedText = useMemo(
+    () => resolveAnswerPipes(data.questionText, allAnswers),
+    [data.questionText, allAnswers]
+  );
+
+  const optionBaseStyle = (isSelected: boolean): React.CSSProperties => ({
+    borderRadius,
+    borderColor: isSelected ? color : cardBorder,
+    backgroundColor: isSelected ? hexWithAlpha(color, 0.08) : cardBg,
+    ...(cardStyle === 'elevated' && !isSelected ? { boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: 'none' } : {}),
+    ...(cardStyle === 'flat' ? { borderWidth: '1px' } : { borderWidth: '2px' }),
+  });
+
+  const inputStyle = (hasValue: boolean): React.CSSProperties => ({
+    borderRadius,
+    borderColor: hasValue ? color : cardBorder,
+    backgroundColor: cardBg,
+    color: textColor,
+    borderWidth: '2px',
+  });
+
+  const unselectedBtnBg = hexWithAlpha(textColor, 0.06);
 
   return (
     <motion.div
@@ -479,12 +601,12 @@ function QuestionScreen({
       exit={{ opacity: 0, y: -20 }}
       className="py-8"
     >
-      <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-        {data.questionText}
+      <h2 className="text-2xl font-semibold mb-2" style={{ color: textColor }}>
+        {resolvedText}
         {data.required && <span className="text-red-500 ml-1">*</span>}
       </h2>
       {data.description && (
-        <p className="text-slate-600 dark:text-slate-400 mb-6">{data.description}</p>
+        <p className="mb-6" style={{ color: mutedTextColor }}>{data.description}</p>
       )}
 
       <div className="mt-6 space-y-3">
@@ -495,25 +617,14 @@ function QuestionScreen({
             <button
               key={option.id}
               onClick={() => onAnswer(option.text)}
-              className={cn(
-                'w-full p-4 rounded-xl border-2 text-left transition-all',
-                answer === option.text
-                  ? 'bg-opacity-10'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-              )}
-              style={{
-                borderColor: answer === option.text ? color : undefined,
-                backgroundColor: answer === option.text ? `${color}15` : undefined,
-              }}
+              className="w-full p-4 text-left transition-all border-solid"
+              style={optionBaseStyle(answer === option.text)}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={cn(
-                    'w-5 h-5 rounded-full border-2 flex items-center justify-center',
-                    answer === option.text ? '' : 'border-slate-300 dark:border-slate-600'
-                  )}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
                   style={{
-                    borderColor: answer === option.text ? color : undefined,
+                    borderColor: answer === option.text ? color : cardBorder,
                     backgroundColor: answer === option.text ? color : undefined,
                   }}
                 >
@@ -521,7 +632,7 @@ function QuestionScreen({
                     <div className="w-2 h-2 rounded-full bg-white" />
                   )}
                 </div>
-                <span className="text-slate-900 dark:text-slate-100">{option.text}</span>
+                <span style={{ color: textColor }}>{option.text}</span>
               </div>
             </button>
           ))}
@@ -541,25 +652,14 @@ function QuestionScreen({
                     onAnswer([...current, option.text]);
                   }
                 }}
-                className={cn(
-                  'w-full p-4 rounded-xl border-2 text-left transition-all',
-                  selected
-                    ? ''
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                )}
-                style={{
-                  borderColor: selected ? color : undefined,
-                  backgroundColor: selected ? `${color}15` : undefined,
-                }}
+                className="w-full p-4 text-left transition-all border-solid"
+                style={optionBaseStyle(selected)}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={cn(
-                      'w-5 h-5 rounded border-2 flex items-center justify-center',
-                      selected ? '' : 'border-slate-300 dark:border-slate-600'
-                    )}
+                    className="w-5 h-5 rounded border-2 flex items-center justify-center"
                     style={{
-                      borderColor: selected ? color : undefined,
+                      borderColor: selected ? color : cardBorder,
                       backgroundColor: selected ? color : undefined,
                     }}
                   >
@@ -579,7 +679,7 @@ function QuestionScreen({
                       </svg>
                     )}
                   </div>
-                  <span className="text-slate-900 dark:text-slate-100">{option.text}</span>
+                  <span style={{ color: textColor }}>{option.text}</span>
                 </div>
               </button>
             );
@@ -597,14 +697,12 @@ function QuestionScreen({
                   <button
                     key={value}
                     onClick={() => onAnswer(value)}
-                    className={cn(
-                      'w-12 h-12 rounded-xl font-semibold transition-all',
-                      answer === value
-                        ? 'scale-110 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    )}
+                    className="w-12 h-12 font-semibold transition-all"
                     style={{
-                      backgroundColor: answer === value ? color : undefined,
+                      borderRadius,
+                      backgroundColor: answer === value ? color : unselectedBtnBg,
+                      color: answer === value ? '#ffffff' : mutedTextColor,
+                      transform: answer === value ? 'scale(1.1)' : undefined,
                     }}
                   >
                     {value}
@@ -612,7 +710,7 @@ function QuestionScreen({
                 );
               })}
             </div>
-            <div className="flex justify-between w-full text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex justify-between w-full text-sm" style={{ color: mutedTextColor }}>
               <span>{data.minLabel}</span>
               <span>{data.maxLabel}</span>
             </div>
@@ -627,10 +725,8 @@ function QuestionScreen({
             onChange={(e) => onAnswer(e.target.value)}
             placeholder={data.placeholder}
             maxLength={data.maxLength}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
-            style={{
-              borderColor: answer ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -642,10 +738,8 @@ function QuestionScreen({
             placeholder={data.placeholder}
             maxLength={data.maxLength}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors resize-none"
-            style={{
-              borderColor: answer ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors resize-none"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -658,10 +752,8 @@ function QuestionScreen({
             placeholder={data.placeholder}
             min={data.minValue}
             max={data.maxValue}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
-            style={{
-              borderColor: answer !== undefined && answer !== '' ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(answer !== undefined && answer !== '')}
           />
         )}
 
@@ -672,10 +764,8 @@ function QuestionScreen({
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
             placeholder={data.placeholder || 'you@example.com'}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
-            style={{
-              borderColor: answer ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -684,10 +774,8 @@ function QuestionScreen({
           <select
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
-            style={{
-              borderColor: answer ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           >
             <option value="">Select an option...</option>
             {data.options.map((option) => (
@@ -704,10 +792,8 @@ function QuestionScreen({
             type="date"
             value={(answer as string) || ''}
             onChange={(e) => onAnswer(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
-            style={{
-              borderColor: answer ? color : undefined,
-            }}
+            className="w-full px-4 py-3 focus:outline-none transition-colors"
+            style={inputStyle(!!answer)}
           />
         )}
 
@@ -719,13 +805,9 @@ function QuestionScreen({
                 <button
                   key={i}
                   onClick={() => onAnswer(i)}
-                  className={cn(
-                    'w-10 h-10 rounded-lg font-semibold text-sm transition-all',
-                    answer === i
-                      ? 'scale-110 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  )}
+                  className="w-10 h-10 font-semibold text-sm transition-all"
                   style={{
+                    borderRadius: `calc(${borderRadius} * 0.6)`,
                     backgroundColor:
                       answer === i
                         ? i <= 6
@@ -733,14 +815,16 @@ function QuestionScreen({
                           : i <= 8
                             ? '#EAB308'
                             : '#22C55E'
-                        : undefined,
+                        : unselectedBtnBg,
+                    color: answer === i ? '#ffffff' : mutedTextColor,
+                    transform: answer === i ? 'scale(1.1)' : undefined,
                   }}
                 >
                   {i}
                 </button>
               ))}
             </div>
-            <div className="flex justify-between w-full text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex justify-between w-full text-sm" style={{ color: mutedTextColor }}>
               <span>{data.minLabel || 'Not likely'}</span>
               <span>{data.maxLabel || 'Very likely'}</span>
             </div>

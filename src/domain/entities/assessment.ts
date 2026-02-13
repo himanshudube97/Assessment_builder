@@ -7,6 +7,9 @@ import type { FlowNode, FlowEdge } from './flow';
 
 export type AssessmentStatus = 'draft' | 'published' | 'closed';
 
+export type ButtonStyle = 'filled' | 'outline' | 'pill';
+export type CardStyle = 'elevated' | 'bordered' | 'flat';
+
 export interface AssessmentSettings {
   primaryColor: string;
   backgroundColor: string;
@@ -20,6 +23,12 @@ export interface AssessmentSettings {
   password: string | null; // Hashed
   scoringEnabled: boolean;
   inviteOnly: boolean;
+
+  // Theme
+  fontFamily: string;
+  borderRadius: string;
+  buttonStyle: ButtonStyle;
+  cardStyle: CardStyle;
 }
 
 export interface Assessment {
@@ -84,6 +93,10 @@ export const DEFAULT_ASSESSMENT_SETTINGS: AssessmentSettings = {
   password: null,
   scoringEnabled: false,
   inviteOnly: false,
+  fontFamily: 'Geist Sans',
+  borderRadius: '12px',
+  buttonStyle: 'filled',
+  cardStyle: 'bordered',
 };
 
 /**

@@ -5,7 +5,7 @@
  * Side panel for editing node properties
  */
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Calendar,
   Gauge,
+  AtSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, useSelectedNode } from '@/presentation/stores/canvas.store';
@@ -37,6 +38,11 @@ import type {
   QuestionOption,
   QuestionType,
 } from '@/domain/entities/flow';
+import {
+  getAncestorQuestionNodes,
+  getDisplayText,
+  buildPipeToken,
+} from '@/lib/answerPiping';
 
 // Color and icon mapping for question types
 const questionTypeConfig: Record<
@@ -318,8 +324,44 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
   const canDisableBranching = useCanvasStore((s) => s.canDisableBranching);
   // Subscribe to edges so this component re-renders when edges change,
   // keeping the canDisableBranching() result fresh (e.g. after deleting a target node)
-  useCanvasStore((s) => s.edges);
+  const edges = useCanvasStore((s) => s.edges);
+  const allNodes = useCanvasStore((s) => s.nodes);
   const config = questionTypeConfig[data.questionType];
+
+  // Answer piping state
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showVariablePicker, setShowVariablePicker] = useState(false);
+
+  const ancestorQuestions = useMemo(
+    () => getAncestorQuestionNodes(nodeId, allNodes, edges),
+    [nodeId, allNodes, edges]
+  );
+
+  const insertVariable = useCallback(
+    (refNodeId: string, questionText: string) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const label = questionText.substring(0, 30).trim();
+      const token = buildPipeToken(refNodeId, label);
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const currentText = data.questionText;
+      const newText =
+        currentText.substring(0, start) + token + currentText.substring(end);
+
+      updateNodeData(nodeId, { questionText: newText });
+
+      requestAnimationFrame(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + token.length;
+        textarea.focus();
+      });
+
+      setShowVariablePicker(false);
+    },
+    [data.questionText, nodeId, updateNodeData]
+  );
 
   const addOption = useCallback(() => {
     const newOption: QuestionOption = {
@@ -376,6 +418,7 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
           </label>
         </div>
         <textarea
+          ref={textareaRef}
           value={data.questionText}
           onChange={(e) =>
             updateNodeData(nodeId, { questionText: e.target.value })
@@ -389,6 +432,86 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
           )}
           placeholder="Enter your question..."
         />
+
+        {/* Answer piping: Insert Answer button + picker */}
+        <div className="relative">
+          <button
+            onClick={() => setShowVariablePicker(!showVariablePicker)}
+            disabled={ancestorQuestions.length === 0}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-colors',
+              ancestorQuestions.length === 0
+                ? 'text-muted-foreground/50 cursor-not-allowed'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+            title={
+              ancestorQuestions.length === 0
+                ? 'Connect previous questions to enable answer piping'
+                : 'Insert a reference to a previous answer'
+            }
+          >
+            <AtSign className="h-3.5 w-3.5" />
+            Insert Answer
+          </button>
+
+          <AnimatePresence>
+            {showVariablePicker && ancestorQuestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute z-50 top-full left-0 mt-1 w-full bg-card border border-border rounded-xl shadow-lg overflow-hidden"
+              >
+                <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border bg-muted/30">
+                  Reference a previous answer
+                </div>
+                <div className="max-h-48 overflow-y-auto p-1">
+                  {ancestorQuestions.map((node) => {
+                    const qData = node.data as QuestionNodeData;
+                    const qConfig = questionTypeConfig[qData.questionType];
+                    const QIcon = qConfig?.icon;
+                    return (
+                      <button
+                        key={node.id}
+                        onClick={() =>
+                          insertVariable(node.id, qData.questionText)
+                        }
+                        className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-muted transition-colors flex items-start gap-2"
+                      >
+                        {QIcon && (
+                          <QIcon
+                            className={cn(
+                              'h-4 w-4 mt-0.5 shrink-0',
+                              qConfig.color
+                            )}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <span className="font-medium truncate block">
+                            {qData.questionText.substring(0, 40)}
+                            {qData.questionText.length > 40 ? '...' : ''}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {qConfig?.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Preview of piped text */}
+        {data.questionText.includes('{{') && (
+          <div className="px-3 py-2 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+            <span className="text-xs font-medium text-foreground/70">Preview: </span>
+            {getDisplayText(data.questionText)}
+          </div>
+        )}
       </div>
 
       {/* Description */}
