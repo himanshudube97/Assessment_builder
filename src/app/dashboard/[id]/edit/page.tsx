@@ -20,7 +20,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCanvasStore } from '@/presentation/stores/canvas.store';
+import { useCanvasStore, canvasUndo, canvasRedo, canvasClearHistory } from '@/presentation/stores/canvas.store';
 import {
   FlowCanvas,
   CanvasSidebar,
@@ -29,18 +29,6 @@ import {
 import { PreviewModal } from '@/presentation/components/preview';
 import { PublishModal } from '@/presentation/components/publish';
 import type { QuestionType } from '@/domain/entities/flow';
-
-// Debounce helper
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 interface EditorPageProps {
   params: Promise<{ id: string }>;
@@ -81,9 +69,6 @@ export default function EditorPage({ params }: EditorPageProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
-  // Debounced dirty state for auto-save
-  const debouncedIsDirty = useDebounce(isDirty, 2000);
-
   // Load assessment on mount
   useEffect(() => {
     async function loadAssessment() {
@@ -106,6 +91,7 @@ export default function EditorPage({ params }: EditorPageProps) {
           assessment.settings?.closeAt
         );
         loadCanvas(assessment.nodes, assessment.edges);
+        canvasClearHistory(); // Don't count initial load as undoable
         setEditableTitle(assessment.title);
       } catch (err) {
         console.error('Error loading assessment:', err);
@@ -117,13 +103,6 @@ export default function EditorPage({ params }: EditorPageProps) {
 
     loadAssessment();
   }, [id, setAssessment, loadCanvas]);
-
-  // Auto-save when dirty and debounced
-  useEffect(() => {
-    if (debouncedIsDirty && !isSaving) {
-      saveAssessment();
-    }
-  }, [debouncedIsDirty]);
 
   // Save assessment
   const saveAssessment = useCallback(async () => {
@@ -155,6 +134,31 @@ export default function EditorPage({ params }: EditorPageProps) {
       setSaving(false);
     }
   }, [id, title, description, isSaving, setSaving, getFlowData, markSaved]);
+
+  // Auto-save: check every 5 seconds, save if dirty
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const { isDirty, isSaving } = useCanvasStore.getState();
+      if (isDirty && !isSaving) {
+        saveAssessment();
+      }
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [saveAssessment]);
+
+  // Save when user switches tabs (prevents losing last <5s of work)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'hidden') {
+        const { isDirty, isSaving } = useCanvasStore.getState();
+        if (isDirty && !isSaving) {
+          saveAssessment();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [saveAssessment]);
 
   // Publish assessment
   const handlePublish = useCallback(async (closeAtDate?: Date) => {
@@ -292,9 +296,31 @@ export default function EditorPage({ params }: EditorPageProps) {
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept undo/redo when typing in form inputs
+      const target = e.target as HTMLElement;
+      const isInputFocused =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         saveAssessment();
+      }
+      // Undo: Ctrl/Cmd+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !isInputFocused) {
+        e.preventDefault();
+        canvasUndo();
+      }
+      // Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+      if (
+        (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
+        ((e.metaKey || e.ctrlKey) && e.key === 'y')) &&
+        !isInputFocused
+      ) {
+        e.preventDefault();
+        canvasRedo();
       }
       // Escape to close preview
       if (e.key === 'Escape' && isPreviewOpen) {

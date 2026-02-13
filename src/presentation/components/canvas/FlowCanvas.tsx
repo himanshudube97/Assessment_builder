@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useStore } from 'zustand';
 import ReactFlow, {
   Background,
   Controls,
@@ -18,9 +19,9 @@ import ReactFlow, {
   type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
 
-import { useCanvasStore } from '@/presentation/stores/canvas.store';
+import { useCanvasStore, canvasUndo, canvasRedo } from '@/presentation/stores/canvas.store';
 import { StartNode } from './StartNode';
 import { QuestionNode } from './QuestionNode';
 import { EndNode } from './EndNode';
@@ -64,6 +65,10 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
   const nodeToUpdateInternals = useCanvasStore((s) => s.nodeToUpdateInternals);
   const clearNodeToUpdateInternals = useCanvasStore((s) => s.clearNodeToUpdateInternals);
+
+  // Reactive undo/redo state
+  const canUndo = useStore(useCanvasStore.temporal, (s) => s.pastStates.length > 0);
+  const canRedo = useStore(useCanvasStore.temporal, (s) => s.futureStates.length > 0);
 
   // When handles change (branching toggled), tell React Flow to recalculate handle positions
   useEffect(() => {
@@ -258,6 +263,22 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
           showInteractive={false}
         />
         <Panel position="top-right" className="flex gap-2">
+          <button
+            onClick={canvasUndo}
+            disabled={!canUndo}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={canvasRedo}
+            disabled={!canRedo}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </button>
           <button
             onClick={autoLayout}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
