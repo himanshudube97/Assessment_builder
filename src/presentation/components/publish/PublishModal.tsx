@@ -510,7 +510,7 @@ export function PublishModal({
                     ) : (
                       <RotateCcw className="h-4 w-4" />
                     )}
-                    Unpublish
+                    Back to Draft
                   </button>
                   <button
                     onClick={handleClose}
@@ -527,12 +527,12 @@ export function PublishModal({
                     ) : (
                       <Lock className="h-4 w-4" />
                     )}
-                    Close
+                    Close Permanently
                   </button>
                 </div>
 
                 <p className="text-xs text-muted-foreground text-center">
-                  <strong>Unpublish</strong> reverts to draft (can edit flow). <strong>Close</strong> stops collecting responses.
+                  <strong>Back to Draft</strong> takes it offline temporarily so you can edit and republish. <strong>Close</strong> ends data collection permanently.
                 </p>
               </>
             )}
@@ -553,7 +553,7 @@ export function PublishModal({
                 </div>
 
                 <p className="text-sm text-muted-foreground">
-                  This assessment is no longer accepting responses. You can reopen it to start collecting again, or unpublish to edit the flow.
+                  This assessment has been permanently closed and is no longer accepting responses.
                 </p>
 
                 {/* Share tabs */}
@@ -601,12 +601,12 @@ export function PublishModal({
                     ) : (
                       <RotateCcw className="h-4 w-4" />
                     )}
-                    Unpublish to Draft
+                    Back to Draft
                   </button>
                 </div>
 
                 <p className="text-xs text-muted-foreground text-center">
-                  <strong>Reopen</strong> starts accepting responses again. <strong>Unpublish</strong> reverts to draft so you can edit the flow.
+                  <strong>Reopen</strong> resumes collecting responses. <strong>Back to Draft</strong> takes it offline so you can edit and republish.
                 </p>
               </>
             )}
