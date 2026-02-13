@@ -79,12 +79,12 @@ describe('getLayoutedElements', () => {
       { id: 'e2', source: 'b', target: 'c' },
     ];
     const result = getLayoutedElements(nodes, edges);
-    // In TB direction, nodes should be vertically ordered
-    const aY = result.nodes.find((n) => n.id === 'a')!.position.y;
-    const bY = result.nodes.find((n) => n.id === 'b')!.position.y;
-    const cY = result.nodes.find((n) => n.id === 'c')!.position.y;
-    expect(aY).toBeLessThan(bY);
-    expect(bY).toBeLessThan(cY);
+    // In LR direction (default), nodes should be horizontally ordered
+    const aX = result.nodes.find((n) => n.id === 'a')!.position.x;
+    const bX = result.nodes.find((n) => n.id === 'b')!.position.x;
+    const cX = result.nodes.find((n) => n.id === 'c')!.position.x;
+    expect(aX).toBeLessThan(bX);
+    expect(bX).toBeLessThan(cX);
   });
 
   it('handles LR direction', () => {

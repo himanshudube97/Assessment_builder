@@ -143,7 +143,7 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
     edges.push(createEdge(sourceId, targetId, condition));
   }
 
-  // 6. Auto-layout with dagre (top-to-bottom)
+  // 6. Auto-layout with dagre (left-to-right)
   const rfNodes: Node[] = allNodes.map((n) => ({
     id: n.id,
     type: n.type,
@@ -158,7 +158,7 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
   }));
 
   const layouted = getLayoutedElements(rfNodes, rfEdges, {
-    direction: 'TB',
+    direction: 'LR',
     rankSep: 100,
     nodeSep: 60,
   });

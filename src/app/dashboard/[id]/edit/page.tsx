@@ -325,7 +325,7 @@ export default function EditorPage({ params }: EditorPageProps) {
   const calculateSmartPosition = useCallback(() => {
     const NODE_WIDTH = 280;
     const NODE_HEIGHT = 180;
-    const SPACING_Y = 60;
+    const SPACING_X = 60;
 
     // Helper to check if position overlaps with any existing node
     const hasOverlap = (x: number, y: number) => {
@@ -343,40 +343,40 @@ export default function EditorPage({ params }: EditorPageProps) {
       let attempts = 0;
 
       while (hasOverlap(x, y) && attempts < 10) {
-        y += NODE_HEIGHT + SPACING_Y;
+        x += NODE_WIDTH + SPACING_X;
         attempts++;
       }
       return { x, y };
     };
 
-    // If a node is selected, place below it
+    // If a node is selected, place to the right of it
     if (selectedNodeId) {
       const selectedNode = nodes.find((n) => n.id === selectedNodeId);
       if (selectedNode) {
         return findNonOverlappingPosition(
-          selectedNode.position.x,
-          selectedNode.position.y + NODE_HEIGHT + SPACING_Y
+          selectedNode.position.x + NODE_WIDTH + SPACING_X,
+          selectedNode.position.y
         );
       }
     }
 
-    // No selection - calculate center of existing nodes and place below
+    // No selection - calculate center of existing nodes and place to the right
     if (nodes.length > 0) {
       // Calculate bounding box
-      let minX = Infinity, maxX = -Infinity;
-      let maxY = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      let maxX = -Infinity;
 
       nodes.forEach((n) => {
-        minX = Math.min(minX, n.position.x);
-        maxX = Math.max(maxX, n.position.x + NODE_WIDTH);
+        minY = Math.min(minY, n.position.y);
         maxY = Math.max(maxY, n.position.y + NODE_HEIGHT);
+        maxX = Math.max(maxX, n.position.x + NODE_WIDTH);
       });
 
-      // Place at horizontal center, below all nodes
-      const centerX = minX + (maxX - minX) / 2 - NODE_WIDTH / 2;
-      const newY = maxY + SPACING_Y;
+      // Place at vertical center, to the right of all nodes
+      const centerY = minY + (maxY - minY) / 2 - NODE_HEIGHT / 2;
+      const newX = maxX + SPACING_X;
 
-      return findNonOverlappingPosition(centerX, newY);
+      return findNonOverlappingPosition(newX, centerY);
     }
 
     // No nodes exist - place at a default starting position

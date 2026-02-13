@@ -119,9 +119,9 @@ export const BaseNode = memo(function BaseNode({
       {showTargetHandle && (
         <Handle
           type="target"
-          position={Position.Top}
+          position={Position.Left}
           className={cn(
-            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-top-2',
+            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-left-2',
             '!transition-all !duration-200',
             'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
             selected && '!bg-primary'
@@ -133,9 +133,9 @@ export const BaseNode = memo(function BaseNode({
       {showSourceHandle && (
         <Handle
           type="source"
-          position={Position.Bottom}
+          position={Position.Right}
           className={cn(
-            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-bottom-2',
+            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-right-2',
             '!transition-all !duration-200',
             'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
             selected && '!bg-primary'

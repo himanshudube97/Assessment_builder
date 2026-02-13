@@ -16,7 +16,7 @@ interface LayoutOptions {
 }
 
 const defaultOptions: Required<LayoutOptions> = {
-  direction: 'TB',
+  direction: 'LR',
   nodeWidth: 280,
   nodeHeight: 180,
   rankSep: 80,
@@ -95,14 +95,14 @@ export function tidyLayout<N extends Node>(
     y: node.position.y,
   }));
 
-  // Sort by Y position (top to bottom), then X (left to right)
-  // This ensures we process nodes in reading order
+  // Sort by X position (left to right), then Y (top to bottom)
+  // This ensures we process nodes in reading order for LR layout
   const sortedIndices = positions
     .map((_, i) => i)
     .sort((a, b) => {
-      const yDiff = positions[a].y - positions[b].y;
-      if (Math.abs(yDiff) > nodeHeight / 2) return yDiff;
-      return positions[a].x - positions[b].x;
+      const xDiff = positions[a].x - positions[b].x;
+      if (Math.abs(xDiff) > nodeWidth / 2) return xDiff;
+      return positions[a].y - positions[b].y;
     });
 
   // Resolve overlaps by iterating through sorted nodes
@@ -123,13 +123,13 @@ export function tidyLayout<N extends Node>(
         const overlapY = prev.y + nodeHeight + minGapY - current.y;
 
         // Push in the direction that requires less movement
-        // Prefer pushing down/right to maintain reading order
-        if (overlapY > 0 && overlapY <= overlapX) {
-          // Push down
-          current.y = prev.y + nodeHeight + minGapY;
-        } else if (overlapX > 0) {
+        // Prefer pushing right/down to maintain reading order for LR layout
+        if (overlapX > 0 && overlapX <= overlapY) {
           // Push right
           current.x = prev.x + nodeWidth + minGapX;
+        } else if (overlapY > 0) {
+          // Push down
+          current.y = prev.y + nodeHeight + minGapY;
         }
       }
     }
@@ -152,8 +152,8 @@ export function tidyLayout<N extends Node>(
       const prev = positions[prevIdx];
 
       if (nodesOverlap(prev, current, nodeWidth, nodeHeight, minGapX, minGapY)) {
-        // After snapping, push down by one grid-aligned step
-        current.y = snapToGrid(prev.y + nodeHeight + minGapY, gridSize);
+        // After snapping, push right by one grid-aligned step
+        current.x = snapToGrid(prev.x + nodeWidth + minGapX, gridSize);
       }
     }
   }
