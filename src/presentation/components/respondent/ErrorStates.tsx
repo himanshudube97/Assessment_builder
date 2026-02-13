@@ -5,7 +5,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { FileQuestion, Lock, AlertCircle, Clock } from 'lucide-react';
+import { FileQuestion, Lock, AlertCircle, Clock, Mail } from 'lucide-react';
 
 interface ErrorStateProps {
   title: string;
@@ -89,6 +89,16 @@ export function ScheduledState({ openAt }: { openAt?: string | null }) {
           : 'This assessment is not yet open.'
       }
       icon={<Clock className="h-10 w-10 text-slate-400" />}
+    />
+  );
+}
+
+export function InviteRequiredState() {
+  return (
+    <ErrorStateBase
+      title="Invitation Required"
+      description="This assessment is invite-only. Please use the link provided in your invitation."
+      icon={<Mail className="h-10 w-10 text-slate-400" />}
     />
   );
 }

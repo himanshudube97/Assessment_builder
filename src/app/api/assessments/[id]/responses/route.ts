@@ -9,9 +9,11 @@ import {
   getAssessmentRepository,
   getResponseRepository,
   getOrganizationRepository,
+  getAssessmentInviteRepository,
 } from '@/infrastructure/database/repositories';
 import type { CreateResponseInput } from '@/domain/entities/response';
 import { canOrgCollectResponse } from '@/domain/entities/organization';
+import { isAssessmentInviteValid } from '@/domain/entities/assessmentInvite';
 
 export async function POST(
   request: NextRequest,
@@ -73,6 +75,36 @@ export async function POST(
         { error: 'This assessment has reached its monthly response limit' },
         { status: 400 }
       );
+    }
+
+    // Check invite-only restriction
+    if (assessment.settings.inviteOnly) {
+      const inviteToken = body.inviteToken;
+      if (!inviteToken) {
+        return NextResponse.json(
+          { error: 'Invite token required' },
+          { status: 403 }
+        );
+      }
+
+      const inviteRepo = getAssessmentInviteRepository();
+      const invite = await inviteRepo.findByToken(inviteToken);
+
+      if (!invite || invite.assessmentId !== assessmentId) {
+        return NextResponse.json(
+          { error: 'Invalid invite token' },
+          { status: 403 }
+        );
+      }
+
+      if (!isAssessmentInviteValid(invite)) {
+        return NextResponse.json(
+          { error: 'This invitation has expired or been fully used' },
+          { status: 403 }
+        );
+      }
+
+      await inviteRepo.incrementUsedCount(invite.id);
     }
 
     // Create response

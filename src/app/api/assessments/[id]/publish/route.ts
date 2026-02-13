@@ -60,6 +60,9 @@ export async function POST(
         ? await bcrypt.hash(body.password, 10)
         : null;
     }
+    if (body.inviteOnly !== undefined) {
+      settingsUpdate.inviteOnly = body.inviteOnly;
+    }
 
     // Update settings if any were provided
     if (Object.keys(settingsUpdate).length > 0) {

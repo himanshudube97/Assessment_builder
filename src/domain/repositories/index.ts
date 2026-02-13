@@ -9,3 +9,4 @@ export * from './membership.repository';
 export * from './invite.repository';
 export * from './assessment.repository';
 export * from './response.repository';
+export * from './assessmentInvite.repository';

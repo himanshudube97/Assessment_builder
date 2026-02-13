@@ -8,6 +8,13 @@
       "when": 1770833898610,
       "tag": "0000_dashing_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770992452563,
+      "tag": "0001_gray_eternals",
+      "breakpoints": true
     }
   ]
 }

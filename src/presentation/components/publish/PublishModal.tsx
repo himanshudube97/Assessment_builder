@@ -30,6 +30,7 @@ import {
   QrCode,
   Link,
   Download,
+  Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -40,12 +41,14 @@ import {
 } from '@/lib/share';
 import type { AssessmentStatus, AssessmentSettings } from '@/domain/entities/assessment';
 import type { FlowValidationError } from '@/domain/entities/flow';
+import { InviteManager } from './InviteManager';
 
 export interface PublishSettings {
   closeAt?: Date;
   openAt?: Date;
   maxResponses?: number | null;
   password?: string | null;
+  inviteOnly?: boolean;
 }
 
 interface PublishModalProps {
@@ -148,6 +151,18 @@ export function PublishModal({
       setTimeout(() => setCopied(null), 2000);
     }
   }, []);
+
+  const handleToggleInviteOnly = useCallback(async (enabled: boolean) => {
+    try {
+      await fetch(`/api/assessments/${assessmentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { inviteOnly: enabled } }),
+      });
+    } catch (err) {
+      console.error('Failed to update invite-only setting:', err);
+    }
+  }, [assessmentId]);
 
   const hasBlockingErrors = validationErrors.some((e) => e.type === 'error');
 
@@ -326,6 +341,13 @@ export function PublishModal({
                     )}
                   </div>
                 </div>
+
+                {/* Invite-Only Mode */}
+                <InviteManager
+                  assessmentId={assessmentId}
+                  inviteOnly={settings?.inviteOnly ?? false}
+                  onToggleInviteOnly={handleToggleInviteOnly}
+                />
 
                 {/* Publish button */}
                 <button
@@ -509,6 +531,15 @@ export function PublishModal({
                   </div>
                 )}
 
+                {/* Invite-Only Mode (published) */}
+                {status === 'published' && (
+                  <InviteManager
+                    assessmentId={assessmentId}
+                    inviteOnly={settings?.inviteOnly ?? false}
+                    onToggleInviteOnly={handleToggleInviteOnly}
+                  />
+                )}
+
                 {/* Active settings summary */}
                 {settings && status === 'published' && (
                   <ActiveSettingsSummary settings={settings} />
@@ -626,6 +657,9 @@ function QRCodePanel({ shareUrl }: { shareUrl: string }) {
 function ActiveSettingsSummary({ settings }: { settings: AssessmentSettings }) {
   const items: { icon: React.ReactNode; label: string }[] = [];
 
+  if (settings.inviteOnly) {
+    items.push({ icon: <Mail className="h-3.5 w-3.5" />, label: 'Invite only' });
+  }
   if (settings.password) {
     items.push({ icon: <Lock className="h-3.5 w-3.5" />, label: 'Password protected' });
   }

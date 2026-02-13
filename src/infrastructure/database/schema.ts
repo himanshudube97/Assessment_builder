@@ -147,6 +147,23 @@ export const assessments = pgTable('assessments', {
 });
 
 // ===========================================
+// Assessment Invites Table
+// ===========================================
+
+export const assessmentInvites = pgTable('assessment_invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  assessmentId: uuid('assessment_id')
+    .notNull()
+    .references(() => assessments.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }),
+  token: varchar('token', { length: 255 }).notNull().unique(),
+  maxUses: integer('max_uses').notNull().default(1),
+  usedCount: integer('used_count').notNull().default(0),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ===========================================
 // Responses Table
 // ===========================================
 
@@ -245,6 +262,14 @@ export const assessmentsRelations = relations(assessments, ({ one, many }) => ({
     references: [users.id],
   }),
   responses: many(responses),
+  invites: many(assessmentInvites),
+}));
+
+export const assessmentInvitesRelations = relations(assessmentInvites, ({ one }) => ({
+  assessment: one(assessments, {
+    fields: [assessmentInvites.assessmentId],
+    references: [assessments.id],
+  }),
 }));
 
 export const responsesRelations = relations(responses, ({ one }) => ({
@@ -285,3 +310,6 @@ export type NewResponseRecord = typeof responses.$inferInsert;
 
 export type SessionRecord = typeof sessions.$inferSelect;
 export type NewSessionRecord = typeof sessions.$inferInsert;
+
+export type AssessmentInviteRecord = typeof assessmentInvites.$inferSelect;
+export type NewAssessmentInviteRecord = typeof assessmentInvites.$inferInsert;

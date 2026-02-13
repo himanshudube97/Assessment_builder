@@ -19,6 +19,7 @@ export interface AssessmentSettings {
   closeAt: Date | null;
   password: string | null; // Hashed
   scoringEnabled: boolean;
+  inviteOnly: boolean;
 }
 
 export interface Assessment {
@@ -82,6 +83,7 @@ export const DEFAULT_ASSESSMENT_SETTINGS: AssessmentSettings = {
   closeAt: null,
   password: null,
   scoringEnabled: false,
+  inviteOnly: false,
 };
 
 /**

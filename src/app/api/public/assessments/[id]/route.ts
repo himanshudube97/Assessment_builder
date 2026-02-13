@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAssessmentRepository } from '@/infrastructure/database/repositories';
+import { getAssessmentRepository, getAssessmentInviteRepository } from '@/infrastructure/database/repositories';
 import { isAssessmentOpen } from '@/domain/entities/assessment';
+import { isAssessmentInviteValid } from '@/domain/entities/assessmentInvite';
 
 export async function GET(
   request: NextRequest,
@@ -41,6 +42,35 @@ export async function GET(
       assessment.settings.openAt !== null &&
       now < new Date(assessment.settings.openAt);
 
+    // Check invite-only restriction
+    if (assessment.settings.inviteOnly) {
+      const inviteToken = request.nextUrl.searchParams.get('invite');
+
+      if (!inviteToken) {
+        return NextResponse.json(
+          { error: 'This assessment requires an invitation', requiresInvite: true },
+          { status: 403 }
+        );
+      }
+
+      const inviteRepo = getAssessmentInviteRepository();
+      const invite = await inviteRepo.findByToken(inviteToken);
+
+      if (!invite || invite.assessmentId !== assessment.id) {
+        return NextResponse.json(
+          { error: 'Invalid invite token', requiresInvite: true },
+          { status: 403 }
+        );
+      }
+
+      if (!isAssessmentInviteValid(invite)) {
+        return NextResponse.json(
+          { error: 'This invitation has expired or been fully used', requiresInvite: true },
+          { status: 403 }
+        );
+      }
+    }
+
     // Return public data only (no userId, googleSheet info, etc.)
     return NextResponse.json({
       id: assessment.id,
@@ -60,6 +90,7 @@ export async function GET(
       requiresPassword: assessment.settings.password !== null,
       isScheduled,
       scheduledOpenAt: isScheduled ? assessment.settings.openAt : null,
+      inviteOnly: assessment.settings.inviteOnly ?? false,
     });
   } catch (error) {
     console.error('Error fetching public assessment:', error);

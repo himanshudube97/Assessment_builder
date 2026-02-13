@@ -33,6 +33,7 @@ interface AssessmentFlowProps {
     scoringEnabled?: boolean;
   };
   isEmbed?: boolean;
+  inviteToken?: string | null;
 }
 
 type AnswerValue = string | string[] | number;
@@ -51,6 +52,7 @@ export function AssessmentFlow({
   edges,
   settings,
   isEmbed = false,
+  inviteToken,
 }: AssessmentFlowProps) {
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
@@ -250,6 +252,7 @@ export function AssessmentFlow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           answers: answerEntities,
+          inviteToken: inviteToken || undefined,
           metadata: {
             userAgent: navigator.userAgent,
             ipCountry: null,
@@ -278,7 +281,7 @@ export function AssessmentFlow({
       console.error('Error submitting response:', err);
       setIsSubmitting(false);
     }
-  }, [assessmentId, answers, nodes, storageKey, isEmbed]);
+  }, [assessmentId, answers, nodes, storageKey, isEmbed, inviteToken]);
 
   // Handle next
   const handleNext = useCallback(() => {

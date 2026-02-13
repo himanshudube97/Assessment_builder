@@ -26,3 +26,6 @@ export * from './flow';
 
 // Response
 export * from './response';
+
+// Assessment Invite
+export * from './assessmentInvite';

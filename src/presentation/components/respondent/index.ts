@@ -6,5 +6,6 @@ export {
   ClosedState,
   NotPublishedState,
   ScheduledState,
+  InviteRequiredState,
   LoadingState,
 } from './ErrorStates';

@@ -57,6 +57,13 @@ export function getPopupEmbedCode(assessmentId: string): string {
 }
 
 /**
+ * Generate an invite link for an assessment
+ */
+export function getInviteShareUrl(assessmentId: string, token: string): string {
+  return `${getShareUrl(assessmentId)}?invite=${token}`;
+}
+
+/**
  * Copy text to clipboard
  * Returns true if successful, false otherwise
  */

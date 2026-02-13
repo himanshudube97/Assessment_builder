@@ -5,13 +5,15 @@
  * Accessible at /a/[id] for respondents to take the assessment
  */
 
-import { useEffect, useState, useCallback, use } from 'react';
+import { useEffect, useState, useCallback, use, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   AssessmentFlow,
   PasswordGate,
   NotFoundState,
   ClosedState,
   ScheduledState,
+  InviteRequiredState,
   LoadingState,
 } from '@/presentation/components/respondent';
 import type { FlowNode, FlowEdge } from '@/domain/entities/flow';
@@ -34,6 +36,7 @@ interface PublicAssessment {
   requiresPassword: boolean;
   isScheduled: boolean;
   scheduledOpenAt: string | null;
+  inviteOnly: boolean;
 }
 
 interface PageProps {
@@ -41,9 +44,20 @@ interface PageProps {
 }
 
 export default function PublicAssessmentPage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <PublicAssessmentContent params={params} />
+    </Suspense>
+  );
+}
+
+function PublicAssessmentContent({ params }: PageProps) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get('invite');
+
   const [assessment, setAssessment] = useState<PublicAssessment | null>(null);
-  const [error, setError] = useState<'not_found' | 'closed' | 'scheduled' | null>(null);
+  const [error, setError] = useState<'not_found' | 'closed' | 'scheduled' | 'invite_required' | null>(null);
   const [scheduledOpenAt, setScheduledOpenAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPasswordVerified, setIsPasswordVerified] = useState(false);
@@ -62,11 +76,22 @@ export default function PublicAssessmentPage({ params }: PageProps) {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/public/assessments/${id}`);
+        const url = inviteToken
+          ? `/api/public/assessments/${id}?invite=${encodeURIComponent(inviteToken)}`
+          : `/api/public/assessments/${id}`;
+        const response = await fetch(url);
 
         if (response.status === 404) {
           setError('not_found');
           return;
+        }
+
+        if (response.status === 403) {
+          const data = await response.json();
+          if (data.requiresInvite) {
+            setError('invite_required');
+            return;
+          }
         }
 
         if (!response.ok) {
@@ -96,7 +121,7 @@ export default function PublicAssessmentPage({ params }: PageProps) {
     }
 
     loadAssessment();
-  }, [id]);
+  }, [id, inviteToken]);
 
   const handlePasswordVerified = useCallback(() => {
     setIsPasswordVerified(true);
@@ -104,6 +129,10 @@ export default function PublicAssessmentPage({ params }: PageProps) {
 
   if (isLoading) {
     return <LoadingState />;
+  }
+
+  if (error === 'invite_required') {
+    return <InviteRequiredState />;
   }
 
   if (error === 'not_found') {
@@ -140,6 +169,7 @@ export default function PublicAssessmentPage({ params }: PageProps) {
       nodes={assessment.nodes}
       edges={assessment.edges}
       settings={assessment.settings}
+      inviteToken={inviteToken}
     />
   );
 }
