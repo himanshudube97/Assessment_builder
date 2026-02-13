@@ -22,6 +22,7 @@ import type {
 } from '@/domain/entities/flow';
 import type { Answer as AnswerEntity } from '@/domain/entities/response';
 import { resolveAnswerPipes } from '@/lib/answerPiping';
+import { BackgroundDecorations } from '@/presentation/components/assessment/BackgroundDecorations';
 
 interface AssessmentFlowProps {
   assessmentId: string;
@@ -31,6 +32,8 @@ interface AssessmentFlowProps {
   settings: {
     primaryColor?: string;
     backgroundColor?: string;
+    backgroundGradient?: string;
+    backgroundDecoration?: any;
     showProgressBar?: boolean;
     allowBackNavigation?: boolean;
     scoringEnabled?: boolean;
@@ -397,104 +400,110 @@ export function AssessmentFlow({
   return (
     <ThemeFontLoader fontFamily={fontFamily}>
       <div
-        className={cn(isEmbed ? 'h-screen' : 'min-h-screen', 'flex flex-col')}
+        className={cn(isEmbed ? 'h-screen' : 'min-h-screen', 'relative flex flex-col overflow-hidden')}
         style={{
-          backgroundColor: bgColor,
+          background: settings.backgroundGradient || bgColor,
           fontFamily: getFontFamilyCSS(fontFamily),
           color: textColor,
         }}
       >
-        {/* Progress bar */}
-        {settings.showProgressBar && currentNode?.type === 'question' && (
-          <div className="h-1" style={{ backgroundColor: hexWithAlpha(color, 0.15) }}>
-            <motion.div
-              className="h-full"
-              style={{ backgroundColor: color }}
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
-        )}
+        {/* Background decorations */}
+        <BackgroundDecorations decoration={settings.backgroundDecoration} />
 
-        {/* Content */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl">
-            <AnimatePresence mode="wait">
-              {!currentNode || currentNode.type === 'start' ? (
-                <StartScreen
-                  key="start"
-                  data={startNode?.data as StartNodeData}
-                  onStart={handleStart}
-                  primaryColor={color}
-                  textColor={textColor}
-                  mutedTextColor={mutedTextColor}
-                  buttonStyle={getStartButtonStyle()}
-                />
-              ) : currentNode.type === 'question' ? (
-                <QuestionScreen
-                  key={currentNode.id}
-                  data={currentNode.data as QuestionNodeData}
-                  answer={answers[currentNode.id]}
-                  onAnswer={handleAnswer}
-                  primaryColor={color}
-                  textColor={textColor}
-                  mutedTextColor={mutedTextColor}
-                  borderRadius={radius}
-                  cardStyle={cardStyle}
-                  cardBg={cardBg}
-                  cardBorder={cardBorder}
-                  allAnswers={answers}
-                />
-              ) : currentNode.type === 'end' ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin" style={{ color: mutedTextColor }} />
-                  <p className="mt-4" style={{ color: mutedTextColor }}>Submitting your response...</p>
-                </div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </div>
+        {/* Content with z-index */}
+        <div className="relative z-10 flex flex-col flex-1">
+          {/* Progress bar */}
+          {settings.showProgressBar && currentNode?.type === 'question' && (
+            <div className="h-1" style={{ backgroundColor: hexWithAlpha(color, 0.15) }}>
+              <motion.div
+                className="h-full"
+                style={{ backgroundColor: color }}
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+          )}
 
-        {/* Footer navigation */}
-        {currentNode?.type === 'question' && (
-          <div style={{ borderTop: `1px solid ${footerBorder}`, backgroundColor: footerBg }}>
-            <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-              {settings.allowBackNavigation ? (
-                <button
-                  onClick={handleBack}
-                  disabled={history.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ color: mutedTextColor, borderRadius: radius }}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Back
-                </button>
-              ) : (
-                <div />
-              )}
-              <button
-                onClick={handleNext}
-                disabled={
-                  ((currentNode.data as QuestionNodeData).required &&
-                    !answers[currentNode.id]) ||
-                  isSubmitting
-                }
-                className="flex items-center gap-2 px-6 py-2 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={getNextButtonStyle()}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
+          {/* Content */}
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl">
+              <AnimatePresence mode="wait">
+                {!currentNode || currentNode.type === 'start' ? (
+                  <StartScreen
+                    key="start"
+                    data={startNode?.data as StartNodeData}
+                    onStart={handleStart}
+                    primaryColor={color}
+                    textColor={textColor}
+                    mutedTextColor={mutedTextColor}
+                    buttonStyle={getStartButtonStyle()}
+                  />
+                ) : currentNode.type === 'question' ? (
+                  <QuestionScreen
+                    key={currentNode.id}
+                    data={currentNode.data as QuestionNodeData}
+                    answer={answers[currentNode.id]}
+                    onAnswer={handleAnswer}
+                    primaryColor={color}
+                    textColor={textColor}
+                    mutedTextColor={mutedTextColor}
+                    borderRadius={radius}
+                    cardStyle={cardStyle}
+                    cardBg={cardBg}
+                    cardBorder={cardBorder}
+                    allAnswers={answers}
+                  />
+                ) : currentNode.type === 'end' ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: mutedTextColor }} />
+                    <p className="mt-4" style={{ color: mutedTextColor }}>Submitting your response...</p>
+                  </div>
+                ) : null}
+              </AnimatePresence>
             </div>
           </div>
-        )}
+
+          {/* Footer navigation */}
+          {currentNode?.type === 'question' && (
+            <div style={{ borderTop: `1px solid ${footerBorder}`, backgroundColor: footerBg }}>
+              <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+                {settings.allowBackNavigation ? (
+                  <button
+                    onClick={handleBack}
+                    disabled={history.length === 0}
+                    className="flex items-center gap-2 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ color: mutedTextColor, borderRadius: radius }}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <button
+                  onClick={handleNext}
+                  disabled={
+                    ((currentNode.data as QuestionNodeData).required &&
+                      !answers[currentNode.id]) ||
+                    isSubmitting
+                  }
+                  className="flex items-center gap-2 px-6 py-2 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={getNextButtonStyle()}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ThemeFontLoader>
   );

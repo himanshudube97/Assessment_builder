@@ -45,6 +45,9 @@ const envSchema = z.object({
   // Error tracking (optional)
   SENTRY_DSN: z.string().optional(),
 
+  // AI (optional)
+  ANTHROPIC_API_KEY: z.string().optional(),
+
   // Node environment
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
@@ -97,5 +100,6 @@ export const features = {
   hasStripe: !!env.STRIPE_SECRET_KEY,
   hasAnalytics: !!env.NEXT_PUBLIC_POSTHOG_KEY,
   hasErrorTracking: !!env.SENTRY_DSN,
+  hasAI: !!env.ANTHROPIC_API_KEY,
   isUsingSupabase: env.DB_PROVIDER === 'supabase',
 };

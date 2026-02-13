@@ -20,6 +20,7 @@ import type {
   EdgeCondition,
 } from '@/domain/entities/flow';
 import { resolveAnswerPipes } from '@/lib/answerPiping';
+import { BackgroundDecorations } from '@/presentation/components/assessment/BackgroundDecorations';
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -249,49 +250,55 @@ export function PreviewModal({
 
           {/* Content */}
           <div
-            className="p-8 min-h-[400px] flex flex-col"
+            className="relative p-8 min-h-[400px] flex flex-col overflow-hidden"
             style={{
-              backgroundColor: bgColor,
+              background: settings?.backgroundGradient || bgColor,
               fontFamily: getFontFamilyCSS(fontFamily),
               color: previewTextColor,
             }}
           >
-            <AnimatePresence mode="wait">
-              {!currentNode || currentNode.type === 'start' ? (
-                <StartScreen
-                  key="start"
-                  data={startNode?.data as StartNodeData}
-                  onStart={handleStart}
-                  buttonStyle={getThemedButtonStyle()}
-                  textColor={previewTextColor}
-                  mutedColor={previewMutedColor}
-                />
-              ) : currentNode.type === 'question' ? (
-                <QuestionScreen
-                  key={currentNode.id}
-                  data={currentNode.data as QuestionNodeData}
-                  answer={answers[currentNode.id]}
-                  onAnswer={handleAnswer}
-                  allAnswers={answers}
-                  nodes={nodes}
-                  primaryColor={color}
-                  textColor={previewTextColor}
-                  mutedColor={previewMutedColor}
-                  borderRadius={radius}
-                  cardBg={previewCardBg}
-                  cardBorder={previewBorder}
-                />
-              ) : currentNode.type === 'end' ? (
-                <EndScreen
-                  key="end"
-                  data={currentNode.data as EndNodeData}
-                  score={null}
-                  primaryColor={color}
-                  textColor={previewTextColor}
-                  mutedColor={previewMutedColor}
-                />
-              ) : null}
-            </AnimatePresence>
+            {/* Background decorations */}
+            <BackgroundDecorations decoration={settings?.backgroundDecoration} />
+
+            {/* Content with z-index to stay above decorations */}
+            <div className="relative z-10 flex-1 flex flex-col">
+              <AnimatePresence mode="wait">
+                {!currentNode || currentNode.type === 'start' ? (
+                  <StartScreen
+                    key="start"
+                    data={startNode?.data as StartNodeData}
+                    onStart={handleStart}
+                    buttonStyle={getThemedButtonStyle()}
+                    textColor={previewTextColor}
+                    mutedColor={previewMutedColor}
+                  />
+                ) : currentNode.type === 'question' ? (
+                  <QuestionScreen
+                    key={currentNode.id}
+                    data={currentNode.data as QuestionNodeData}
+                    answer={answers[currentNode.id]}
+                    onAnswer={handleAnswer}
+                    allAnswers={answers}
+                    nodes={nodes}
+                    primaryColor={color}
+                    textColor={previewTextColor}
+                    mutedColor={previewMutedColor}
+                    borderRadius={radius}
+                    cardBg={previewCardBg}
+                    cardBorder={previewBorder}
+                  />
+                ) : currentNode.type === 'end' ? (
+                  <EndScreen
+                    key="end"
+                    data={currentNode.data as EndNodeData}
+                    score={null}
+                    primaryColor={color}
+                    textColor={previewTextColor}
+                    mutedColor={previewMutedColor}
+                  />
+                ) : null}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* Footer navigation */}

@@ -20,7 +20,9 @@ import {
   Globe,
   Palette,
   Lock,
+  Sparkles,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, canvasUndo, canvasRedo, canvasClearHistory } from '@/presentation/stores/canvas.store';
 import {
@@ -31,6 +33,8 @@ import {
 import { PreviewModal } from '@/presentation/components/preview';
 import { PublishModal } from '@/presentation/components/publish';
 import { AppearanceModal } from '@/presentation/components/appearance';
+import { AIGenerateModal } from '@/presentation/components/ai-generate';
+import type { AIGenerateConfig } from '@/presentation/components/ai-generate';
 import type { PublishSettings } from '@/presentation/components/publish/PublishModal';
 import type { AssessmentSettings } from '@/domain/entities/assessment';
 import type { QuestionType } from '@/domain/entities/flow';
@@ -69,6 +73,7 @@ export default function EditorPage({ params }: EditorPageProps) {
     setSaving,
     getFlowData,
     updateSettings,
+    markDirty,
   } = useCanvasStore();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +83,7 @@ export default function EditorPage({ params }: EditorPageProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
+  const [isAIGenerateOpen, setIsAIGenerateOpen] = useState(false);
 
   // Load assessment on mount
   useEffect(() => {
@@ -272,6 +278,35 @@ export default function EditorPage({ params }: EditorPageProps) {
 
     updateSettings(themeSettings);
   }, [id, updateSettings]);
+
+  // AI Generate handler
+  const handleAIGenerate = useCallback(async (config: AIGenerateConfig) => {
+    const response = await fetch('/api/assessments/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to generate');
+    }
+
+    const result = await response.json();
+
+    // Load the generated flow onto canvas
+    updateTitle(result.title);
+    if (result.description) {
+      updateDescription(result.description);
+    }
+    setEditableTitle(result.title);
+    loadCanvas(result.nodes, result.edges);
+    markDirty();
+
+    // Close modal and show success toast
+    setIsAIGenerateOpen(false);
+    toast.success('Assessment generated! You can undo with Ctrl+Z.');
+  }, [updateTitle, updateDescription, loadCanvas, markDirty]);
 
   // Handle title edit
   const handleTitleSubmit = useCallback(() => {
@@ -536,6 +571,21 @@ export default function EditorPage({ params }: EditorPageProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* AI Generate button */}
+          {!isFlowLocked && (
+            <button
+              onClick={() => setIsAIGenerateOpen(true)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
+                'bg-violet-600 text-white',
+                'hover:bg-violet-700'
+              )}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="text-sm font-medium">AI Generate</span>
+            </button>
+          )}
+
           {/* Save button */}
           <button
             onClick={saveAssessment}
@@ -662,6 +712,14 @@ export default function EditorPage({ params }: EditorPageProps) {
         onCloseAssessment={handleCloseAssessment}
         onUnpublish={handleUnpublish}
         onUpdateSettings={handleUpdatePublishSettings}
+      />
+
+      {/* AI Generate Modal */}
+      <AIGenerateModal
+        isOpen={isAIGenerateOpen}
+        onClose={() => setIsAIGenerateOpen(false)}
+        onGenerate={handleAIGenerate}
+        isFlowLocked={isFlowLocked}
       />
     </div>
   );

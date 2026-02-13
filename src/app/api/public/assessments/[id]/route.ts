@@ -87,6 +87,13 @@ export async function GET(
         borderRadius: assessment.settings.borderRadius,
         buttonStyle: assessment.settings.buttonStyle,
         cardStyle: assessment.settings.cardStyle,
+        // Enhanced template properties
+        backgroundGradient: assessment.settings.backgroundGradient,
+        accentGradient: assessment.settings.accentGradient,
+        shadowStyle: assessment.settings.shadowStyle,
+        glassEffect: assessment.settings.glassEffect,
+        animationPreset: assessment.settings.animationPreset,
+        backgroundDecoration: assessment.settings.backgroundDecoration,
       },
       status: assessment.status,
       isOpen,

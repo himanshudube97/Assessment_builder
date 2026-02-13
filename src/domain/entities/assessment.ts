@@ -4,11 +4,14 @@
  */
 
 import type { FlowNode, FlowEdge } from './flow';
+import type { BackgroundDecoration } from '@/domain/constants/templates';
 
 export type AssessmentStatus = 'draft' | 'published' | 'closed';
 
 export type ButtonStyle = 'filled' | 'outline' | 'pill';
 export type CardStyle = 'elevated' | 'bordered' | 'flat';
+export type ShadowStyle = 'minimal' | 'soft' | 'dramatic';
+export type AnimationPreset = 'subtle' | 'smooth' | 'playful' | 'elegant';
 
 export interface AssessmentSettings {
   primaryColor: string;
@@ -29,6 +32,19 @@ export interface AssessmentSettings {
   borderRadius: string;
   buttonStyle: ButtonStyle;
   cardStyle: CardStyle;
+
+  // Enhanced visual properties (optional for backward compatibility)
+  backgroundGradient?: string;
+  accentGradient?: string;
+  shadowStyle?: ShadowStyle;
+  glassEffect?: boolean;
+  animationPreset?: AnimationPreset;
+
+  // Background decorations
+  backgroundDecoration?: BackgroundDecoration;
+
+  // Custom CSS mode
+  customCSSEnabled?: boolean;
 }
 
 export interface Assessment {
@@ -97,6 +113,12 @@ export const DEFAULT_ASSESSMENT_SETTINGS: AssessmentSettings = {
   borderRadius: '12px',
   buttonStyle: 'filled',
   cardStyle: 'bordered',
+  // Enhanced visual properties
+  backgroundGradient: undefined,
+  accentGradient: undefined,
+  shadowStyle: 'soft',
+  glassEffect: false,
+  animationPreset: 'smooth',
 };
 
 /**
