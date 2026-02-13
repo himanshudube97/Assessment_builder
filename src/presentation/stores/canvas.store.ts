@@ -54,6 +54,10 @@ interface CanvasState {
   // New node spotlight mode
   newlyAddedNodeId: string | null;
 
+  // Signal to FlowCanvas that a node's handles changed and React Flow
+  // needs to recalculate handle positions via updateNodeInternals()
+  nodeToUpdateInternals: string | null;
+
   // Actions
   setAssessment: (
     id: string,
@@ -107,6 +111,9 @@ interface CanvasState {
 
   // Spotlight mode
   clearNewlyAddedNode: () => void;
+
+  // Handle internals update
+  clearNodeToUpdateInternals: () => void;
 
   // Reset
   reset: () => void;
@@ -178,6 +185,7 @@ const initialState = {
   isSaving: false,
   lastSavedAt: null,
   newlyAddedNodeId: null,
+  nodeToUpdateInternals: null,
 };
 
 export const useCanvasStore = create<CanvasState>()(
@@ -212,9 +220,31 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       loadCanvas: (nodes, edges) => {
+        const rfNodes = nodes.map(toRFNode);
+        let rfEdges = edges.map(toRFEdge);
+
+        // Reconcile: if a node has branching enabled but edges still point to
+        // the bottom handle (sourceHandle: null), migrate them to the first option.
+        // This fixes data saved before the atomic-toggle fix.
+        for (const node of rfNodes) {
+          if (node.type !== 'question') continue;
+          const data = node.data as QuestionNodeData;
+          const hasBranching =
+            data.questionType === 'yes_no' ||
+            (data.questionType === 'multiple_choice_single' && data.enableBranching);
+          if (hasBranching && data.options?.length) {
+            const firstOptId = data.options[0].id;
+            rfEdges = rfEdges.map((e) =>
+              e.source === node.id && !e.sourceHandle
+                ? { ...e, sourceHandle: firstOptId }
+                : e
+            );
+          }
+        }
+
         set({
-          nodes: nodes.map(toRFNode),
-          edges: edges.map(toRFEdge),
+          nodes: rfNodes,
+          edges: rfEdges,
           isDirty: false,
         });
       },
@@ -343,29 +373,30 @@ export const useCanvasStore = create<CanvasState>()(
         };
 
         if (enable && firstOptionId) {
-          // Step 1: Update node so option handles render in the DOM
+          // Atomic update: enable branching on node AND migrate edges in one render cycle
           set((s) => ({
             nodes: s.nodes.map((n) =>
               n.id === nodeId
                 ? { ...n, data: { ...n.data, enableBranching: true } as RFNode['data'] }
                 : n
             ),
+            edges: s.edges.map((e) =>
+              e.source === nodeId && !e.sourceHandle
+                ? remakeEdge(e, firstOptionId)
+                : e
+            ),
             isDirty: true,
+            nodeToUpdateInternals: nodeId,
           }));
-          // Step 2: After handles are in the DOM, migrate edges to first option
-          requestAnimationFrame(() => {
-            set((s) => ({
-              edges: s.edges.map((e) =>
-                e.source === nodeId && !e.sourceHandle
-                  ? remakeEdge(e, firstOptionId)
-                  : e
-              ),
-            }));
-          });
         } else if (!enable) {
-          // Step 1: Migrate edges back to bottom handle first (while option handles still exist)
+          // Atomic update: disable branching on node AND migrate edges in one render cycle
           const seen = new Set<string>();
           set((s) => ({
+            nodes: s.nodes.map((n) =>
+              n.id === nodeId
+                ? { ...n, data: { ...n.data, enableBranching: false } as RFNode['data'] }
+                : n
+            ),
             edges: s.edges.reduce<RFEdge[]>((acc, e) => {
               if (e.source === nodeId && e.sourceHandle) {
                 if (!seen.has(e.target)) {
@@ -378,17 +409,8 @@ export const useCanvasStore = create<CanvasState>()(
               return acc;
             }, []),
             isDirty: true,
+            nodeToUpdateInternals: nodeId,
           }));
-          // Step 2: After edges are re-routed, remove option handles
-          requestAnimationFrame(() => {
-            set((s) => ({
-              nodes: s.nodes.map((n) =>
-                n.id === nodeId
-                  ? { ...n, data: { ...n.data, enableBranching: false } as RFNode['data'] }
-                  : n
-              ),
-            }));
-          });
         }
       },
 
@@ -439,6 +461,10 @@ export const useCanvasStore = create<CanvasState>()(
 
       clearNewlyAddedNode: () => {
         set({ newlyAddedNodeId: null });
+      },
+
+      clearNodeToUpdateInternals: () => {
+        set({ nodeToUpdateInternals: null });
       },
 
       reset: () => set(initialState),

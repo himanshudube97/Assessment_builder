@@ -13,6 +13,7 @@ import ReactFlow, {
   Panel,
   ReactFlowProvider,
   useReactFlow,
+  useUpdateNodeInternals,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { LayoutGrid } from 'lucide-react';
@@ -47,6 +48,7 @@ interface FlowCanvasProps {
 function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -58,6 +60,19 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const autoLayout = useCanvasStore((s) => s.autoLayout);
   const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
+  const nodeToUpdateInternals = useCanvasStore((s) => s.nodeToUpdateInternals);
+  const clearNodeToUpdateInternals = useCanvasStore((s) => s.clearNodeToUpdateInternals);
+
+  // When handles change (branching toggled), tell React Flow to recalculate handle positions
+  useEffect(() => {
+    if (nodeToUpdateInternals) {
+      // Small delay to let React commit the new handles to the DOM first
+      requestAnimationFrame(() => {
+        updateNodeInternals(nodeToUpdateInternals);
+        clearNodeToUpdateInternals();
+      });
+    }
+  }, [nodeToUpdateInternals, updateNodeInternals, clearNodeToUpdateInternals]);
 
   // Auto-dismiss node highlight after a short delay
   useEffect(() => {

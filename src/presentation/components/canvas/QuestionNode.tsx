@@ -110,20 +110,18 @@ export const QuestionNode = memo(function QuestionNode({
                   {/* Option text */}
                   <span className="truncate flex-1 text-muted-foreground">{option.text}</span>
 
-                  {/* Per-option handle - inside the option row */}
+                  {/* Per-option handle - positioned at right edge of node */}
                   {hasOptionBranching && (
-                    <div className="absolute -right-[22px] top-1/2 -translate-y-1/2">
-                      <Handle
-                        type="source"
-                        position={Position.Right}
-                        id={option.id}
-                        className={cn(
-                          '!relative !transform-none !inset-auto',
-                          '!w-3 !h-3 !bg-indigo-400 !border-2 !border-background !shadow-sm !rounded-full',
-                          'hover:!w-4 hover:!h-4 !transition-all !duration-200'
-                        )}
-                      />
-                    </div>
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={option.id}
+                      className={cn(
+                        '!w-3 !h-3 !bg-indigo-400 !border-2 !border-background !shadow-sm !rounded-full',
+                        'hover:!w-4 hover:!h-4 !transition-all !duration-200'
+                      )}
+                      style={{ right: '-22px', top: '50%' }}
+                    />
                   )}
                 </div>
               ))}
