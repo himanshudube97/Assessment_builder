@@ -30,6 +30,7 @@ const AUTH_ROUTES = [
 const PUBLIC_ROUTES = [
   '/',
   '/a/', // Public assessment routes
+  '/embed/', // Embeddable assessment routes
   '/api/public/',
   '/api/auth/',
   '/api/invites/',

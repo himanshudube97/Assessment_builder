@@ -2,11 +2,12 @@
 
 /**
  * PublishModal Component
- * Modal for publishing assessments with settings, share link, and close options
+ * Modal for publishing assessments with settings, share link, embed, QR, and close options
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   X,
   Share2,
@@ -25,9 +26,18 @@ import {
   Clock,
   Shield,
   Hash,
+  Code,
+  QrCode,
+  Link,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getShareUrl, copyToClipboard } from '@/lib/share';
+import {
+  getShareUrl,
+  copyToClipboard,
+  getIframeEmbedCode,
+  getPopupEmbedCode,
+} from '@/lib/share';
 import type { AssessmentStatus, AssessmentSettings } from '@/domain/entities/assessment';
 import type { FlowValidationError } from '@/domain/entities/flow';
 
@@ -52,6 +62,8 @@ interface PublishModalProps {
   onCloseAssessment: () => Promise<void>;
 }
 
+type ShareTab = 'link' | 'embed' | 'qr';
+
 export function PublishModal({
   isOpen,
   onClose,
@@ -75,8 +87,9 @@ export function PublishModal({
   // UI state
   const [isPublishing, setIsPublishing] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<FlowValidationError[]>([]);
+  const [shareTab, setShareTab] = useState<ShareTab>('link');
 
   const shareUrl = getShareUrl(assessmentId);
 
@@ -86,7 +99,6 @@ export function PublishModal({
       setOpenAt(settings.openAt ? new Date(settings.openAt).toISOString().slice(0, 16) : '');
       setCloseAt(settings.closeAt ? new Date(settings.closeAt).toISOString().slice(0, 16) : '');
       setMaxResponses(settings.maxResponses ? String(settings.maxResponses) : '');
-      // Don't pre-fill password (it's hashed in DB)
       setPassword('');
     } else if (isOpen) {
       setOpenAt('');
@@ -95,6 +107,8 @@ export function PublishModal({
       setPassword('');
     }
     setValidationErrors([]);
+    setCopied(null);
+    setShareTab('link');
   }, [isOpen, settings, initialCloseAt]);
 
   const handlePublish = useCallback(async () => {
@@ -127,13 +141,13 @@ export function PublishModal({
     }
   }, [onCloseAssessment]);
 
-  const handleCopyLink = useCallback(async () => {
-    const success = await copyToClipboard(shareUrl);
+  const handleCopy = useCallback(async (text: string, key: string) => {
+    const success = await copyToClipboard(text);
     if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
     }
-  }, [shareUrl]);
+  }, []);
 
   const hasBlockingErrors = validationErrors.some((e) => e.type === 'error');
 
@@ -238,8 +252,6 @@ export function PublishModal({
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     Schedule
                   </h3>
-
-                  {/* Start date */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">
                       Start date (optional)
@@ -251,8 +263,6 @@ export function PublishModal({
                       className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
-
-                  {/* End date */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">
                       End date (optional)
@@ -272,8 +282,6 @@ export function PublishModal({
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     Access Control
                   </h3>
-
-                  {/* Response limit */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">
                       Response limit (optional)
@@ -290,8 +298,6 @@ export function PublishModal({
                       />
                     </div>
                   </div>
-
-                  {/* Password */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">
                       Password protection (optional)
@@ -359,55 +365,121 @@ export function PublishModal({
                   </div>
                 </div>
 
-                {/* Share link */}
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Share link
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={shareUrl}
-                      readOnly
-                      className="flex-1 px-4 py-2 rounded-lg border border-border bg-muted text-foreground text-sm"
-                    />
-                    <button
-                      onClick={handleCopyLink}
-                      className={cn(
-                        'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
-                        copied
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      )}
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </>
-                      )}
-                    </button>
+                {/* Share tabs */}
+                <div className="space-y-4">
+                  <div className="flex gap-1 p-1 rounded-lg bg-muted">
+                    {([
+                      { key: 'link' as const, label: 'Link', icon: Link },
+                      { key: 'embed' as const, label: 'Embed', icon: Code },
+                      { key: 'qr' as const, label: 'QR Code', icon: QrCode },
+                    ]).map(({ key, label, icon: Icon }) => (
+                      <button
+                        key={key}
+                        onClick={() => setShareTab(key)}
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                          shareTab === key
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                </div>
 
-                {/* Open link */}
-                <a
-                  href={shareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    'flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
-                    'border border-border hover:bg-muted'
+                  {/* Link tab */}
+                  {shareTab === 'link' && (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={shareUrl}
+                          readOnly
+                          className="flex-1 px-4 py-2 rounded-lg border border-border bg-muted text-foreground text-sm"
+                        />
+                        <button
+                          onClick={() => handleCopy(shareUrl, 'link')}
+                          className={cn(
+                            'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
+                            copied === 'link'
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                              : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          )}
+                        >
+                          {copied === 'link' ? (
+                            <><Check className="h-4 w-4" /> Copied</>
+                          ) : (
+                            <><Copy className="h-4 w-4" /> Copy</>
+                          )}
+                        </button>
+                      </div>
+                      <a
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open Assessment
+                      </a>
+                    </div>
                   )}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open Assessment
-                </a>
+
+                  {/* Embed tab */}
+                  {shareTab === 'embed' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                          Inline embed
+                        </label>
+                        <div className="relative">
+                          <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all">
+                            {getIframeEmbedCode(assessmentId)}
+                          </pre>
+                          <button
+                            onClick={() => handleCopy(getIframeEmbedCode(assessmentId), 'iframe')}
+                            className={cn(
+                              'absolute top-2 right-2 p-1.5 rounded-md transition-all',
+                              copied === 'iframe'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                            )}
+                          >
+                            {copied === 'iframe' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                          Popup button
+                        </label>
+                        <div className="relative">
+                          <pre className="p-3 rounded-lg bg-muted border border-border text-xs text-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-32">
+                            {getPopupEmbedCode(assessmentId)}
+                          </pre>
+                          <button
+                            onClick={() => handleCopy(getPopupEmbedCode(assessmentId), 'popup')}
+                            className={cn(
+                              'absolute top-2 right-2 p-1.5 rounded-md transition-all',
+                              copied === 'popup'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-background text-muted-foreground hover:text-foreground border border-border'
+                            )}
+                          >
+                            {copied === 'popup' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* QR Code tab */}
+                  {shareTab === 'qr' && (
+                    <QRCodePanel shareUrl={shareUrl} />
+                  )}
+                </div>
 
                 {/* Status info */}
                 {status === 'published' && (
@@ -468,6 +540,83 @@ export function PublishModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+/**
+ * QR Code panel with download functionality
+ */
+function QRCodePanel({ shareUrl }: { shareUrl: string }) {
+  const [qrSize, setQrSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const sizeMap = { sm: 128, md: 200, lg: 280 };
+  const size = sizeMap[qrSize];
+
+  const handleDownload = useCallback(() => {
+    const svgElement = qrRef.current?.querySelector('svg');
+    if (!svgElement) return;
+
+    const canvas = document.createElement('canvas');
+    const downloadSize = sizeMap.lg * 2; // High-res download
+    canvas.width = downloadSize;
+    canvas.height = downloadSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const img = new Image();
+    img.onload = () => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, downloadSize, downloadSize);
+      ctx.drawImage(img, 0, 0, downloadSize, downloadSize);
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'flowform-qr-code.png';
+      a.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div ref={qrRef} className="p-4 bg-white rounded-lg">
+        <QRCodeSVG
+          value={shareUrl}
+          size={size}
+          level="M"
+          includeMargin={false}
+        />
+      </div>
+
+      {/* Size selector */}
+      <div className="flex gap-1 p-1 rounded-lg bg-muted">
+        {(['sm', 'md', 'lg'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setQrSize(s)}
+            className={cn(
+              'px-3 py-1 rounded-md text-xs font-medium transition-all',
+              qrSize === s
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {s === 'sm' ? 'Small' : s === 'md' ? 'Medium' : 'Large'}
+          </button>
+        ))}
+      </div>
+
+      {/* Download button */}
+      <button
+        onClick={handleDownload}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border border-border hover:bg-muted"
+      >
+        <Download className="h-4 w-4" />
+        Download PNG
+      </button>
+    </div>
   );
 }
 

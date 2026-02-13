@@ -32,6 +32,7 @@ interface AssessmentFlowProps {
     allowBackNavigation?: boolean;
     scoringEnabled?: boolean;
   };
+  isEmbed?: boolean;
 }
 
 type AnswerValue = string | string[] | number;
@@ -49,6 +50,7 @@ export function AssessmentFlow({
   nodes,
   edges,
   settings,
+  isEmbed = false,
 }: AssessmentFlowProps) {
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
@@ -263,12 +265,20 @@ export function AssessmentFlow({
       // Clear localStorage on successful submission
       localStorage.removeItem(storageKey);
 
+      // Notify parent window in embed mode
+      if (isEmbed && window.parent !== window) {
+        window.parent.postMessage(
+          { type: 'flowform:submitted', assessmentId },
+          '*'
+        );
+      }
+
       setIsSubmitted(true);
     } catch (err) {
       console.error('Error submitting response:', err);
       setIsSubmitting(false);
     }
-  }, [assessmentId, answers, nodes, storageKey]);
+  }, [assessmentId, answers, nodes, storageKey, isEmbed]);
 
   // Handle next
   const handleNext = useCallback(() => {
@@ -313,7 +323,7 @@ export function AssessmentFlow({
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className={cn(isEmbed ? 'h-screen' : 'min-h-screen', 'flex flex-col')}
       style={{ backgroundColor: settings.backgroundColor || '#f8fafc' }}
     >
       {/* Progress bar */}
