@@ -224,10 +224,14 @@ function ConditionEditor({
   const options = nodeData?.options || [];
   const isSingleSelect =
     nodeData?.questionType === 'multiple_choice_single' ||
-    nodeData?.questionType === 'yes_no';
+    nodeData?.questionType === 'yes_no' ||
+    nodeData?.questionType === 'dropdown';
   const isMultiSelect = nodeData?.questionType === 'multiple_choice_multi';
   const isMultipleChoice = isSingleSelect || isMultiSelect;
   const isRating = nodeData?.questionType === 'rating';
+  const isNumeric =
+    nodeData?.questionType === 'number' ||
+    nodeData?.questionType === 'nps';
 
   const toggleOption = (id: string) => {
     setSelectedOptionIds((prev) =>
@@ -258,7 +262,7 @@ function ConditionEditor({
     } else if (value.trim()) {
       onSave({
         type,
-        value: isRating ? Number(value) : value,
+        value: isRating || isNumeric ? Number(value) : value,
       });
     } else {
       onSave(null);
@@ -305,7 +309,7 @@ function ConditionEditor({
             <option value="not_equals">Does not equal</option>
             {!isMultipleChoice && (
               <>
-                <option value="contains">Contains</option>
+                {!isNumeric && <option value="contains">Contains</option>}
                 <option value="greater_than">Greater than</option>
                 <option value="less_than">Less than</option>
               </>
@@ -377,10 +381,10 @@ function ConditionEditor({
             </select>
           ) : (
             <input
-              type={isRating ? 'number' : 'text'}
+              type={isRating || isNumeric ? 'number' : 'text'}
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder={isRating ? 'e.g., 3' : 'e.g., Yes'}
+              placeholder={isRating || isNumeric ? 'e.g., 3' : 'e.g., Yes'}
               className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           )}

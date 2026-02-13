@@ -16,6 +16,11 @@ import {
   ToggleLeft,
   Flag,
   GripVertical,
+  Hash,
+  Mail,
+  ChevronDown,
+  Calendar,
+  Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QuestionType } from '@/domain/entities/flow';
@@ -77,6 +82,46 @@ const questionTypes: QuestionTypeItem[] = [
     icon: <ToggleLeft className="h-5 w-5" />,
     color: 'text-teal-500',
     bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+  },
+  {
+    type: 'number',
+    label: 'Number',
+    description: 'Numeric input',
+    icon: <Hash className="h-5 w-5" />,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+  },
+  {
+    type: 'email',
+    label: 'Email',
+    description: 'Email address',
+    icon: <Mail className="h-5 w-5" />,
+    color: 'text-rose-500',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+  },
+  {
+    type: 'dropdown',
+    label: 'Dropdown',
+    description: 'Select from list',
+    icon: <ChevronDown className="h-5 w-5" />,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+  },
+  {
+    type: 'date',
+    label: 'Date',
+    description: 'Date picker',
+    icon: <Calendar className="h-5 w-5" />,
+    color: 'text-sky-500',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+  },
+  {
+    type: 'nps',
+    label: 'NPS Score',
+    description: '0-10 loyalty scale',
+    icon: <Gauge className="h-5 w-5" />,
+    color: 'text-lime-500',
+    bgColor: 'bg-lime-100 dark:bg-lime-900/30',
   },
 ];
 

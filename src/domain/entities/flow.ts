@@ -14,7 +14,12 @@ export type QuestionType =
   | 'short_text'
   | 'long_text'
   | 'rating'
-  | 'yes_no';
+  | 'yes_no'
+  | 'number'
+  | 'email'
+  | 'dropdown'
+  | 'date'
+  | 'nps';
 
 export interface Position {
   x: number;
@@ -200,6 +205,30 @@ export function createQuestionNode(
         { id: `opt-${Date.now()}-no`, text: 'No' },
       ];
       baseData.enableBranching = true;
+      break;
+    case 'number':
+      baseData.placeholder = 'Enter a number...';
+      baseData.minValue = undefined;
+      baseData.maxValue = undefined;
+      break;
+    case 'email':
+      baseData.placeholder = 'you@example.com';
+      break;
+    case 'dropdown':
+      baseData.options = [
+        { id: `opt-${Date.now()}-1`, text: 'Option 1' },
+        { id: `opt-${Date.now()}-2`, text: 'Option 2' },
+        { id: `opt-${Date.now()}-3`, text: 'Option 3' },
+      ];
+      break;
+    case 'date':
+      baseData.placeholder = 'Select a date...';
+      break;
+    case 'nps':
+      baseData.minValue = 0;
+      baseData.maxValue = 10;
+      baseData.minLabel = 'Not likely';
+      baseData.maxLabel = 'Very likely';
       break;
   }
 

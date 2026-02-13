@@ -15,6 +15,11 @@ import {
   Star,
   ToggleLeft,
   HelpCircle,
+  Hash,
+  Mail,
+  ChevronDown,
+  Calendar,
+  Gauge,
 } from 'lucide-react';
 import { BaseNode } from './BaseNode';
 import type { QuestionNodeData, QuestionType } from '@/domain/entities/flow';
@@ -27,6 +32,11 @@ const questionTypeIcons: Record<QuestionType, React.ReactNode> = {
   long_text: <AlignLeft className="h-4 w-4" />,
   rating: <Star className="h-4 w-4" />,
   yes_no: <ToggleLeft className="h-4 w-4" />,
+  number: <Hash className="h-4 w-4" />,
+  email: <Mail className="h-4 w-4" />,
+  dropdown: <ChevronDown className="h-4 w-4" />,
+  date: <Calendar className="h-4 w-4" />,
+  nps: <Gauge className="h-4 w-4" />,
 };
 
 const questionTypeLabels: Record<QuestionType, string> = {
@@ -36,6 +46,11 @@ const questionTypeLabels: Record<QuestionType, string> = {
   long_text: 'Long Text',
   rating: 'Rating',
   yes_no: 'Yes / No',
+  number: 'Number',
+  email: 'Email',
+  dropdown: 'Dropdown',
+  date: 'Date',
+  nps: 'NPS Score',
 };
 
 // Different colors for each question type
@@ -46,6 +61,11 @@ const questionTypeColors: Record<QuestionType, { header: string; border: string 
   long_text: { header: 'bg-teal-500', border: 'border-teal-300 dark:border-teal-700' },
   rating: { header: 'bg-amber-500', border: 'border-amber-300 dark:border-amber-700' },
   yes_no: { header: 'bg-pink-500', border: 'border-pink-300 dark:border-pink-700' },
+  number: { header: 'bg-emerald-500', border: 'border-emerald-300 dark:border-emerald-700' },
+  email: { header: 'bg-rose-500', border: 'border-rose-300 dark:border-rose-700' },
+  dropdown: { header: 'bg-purple-500', border: 'border-purple-300 dark:border-purple-700' },
+  date: { header: 'bg-sky-500', border: 'border-sky-300 dark:border-sky-700' },
+  nps: { header: 'bg-lime-500', border: 'border-lime-300 dark:border-lime-700' },
 };
 
 export const QuestionNode = memo(function QuestionNode({
@@ -158,6 +178,67 @@ export const QuestionNode = memo(function QuestionNode({
             <span className="text-sm text-muted-foreground/50">
               {data.placeholder || 'Text input...'}
             </span>
+          </div>
+        )}
+
+        {/* Number input preview */}
+        {data.questionType === 'number' && (
+          <div className="border border-dashed border-muted-foreground/30 rounded-lg px-3 py-2 flex items-center gap-2">
+            <Hash className="h-3.5 w-3.5 text-muted-foreground/40" />
+            <span className="text-sm text-muted-foreground/50">
+              {data.placeholder || 'Enter a number...'}
+            </span>
+          </div>
+        )}
+
+        {/* Email input preview */}
+        {data.questionType === 'email' && (
+          <div className="border border-dashed border-muted-foreground/30 rounded-lg px-3 py-2 flex items-center gap-2">
+            <Mail className="h-3.5 w-3.5 text-muted-foreground/40" />
+            <span className="text-sm text-muted-foreground/50">
+              {data.placeholder || 'you@example.com'}
+            </span>
+          </div>
+        )}
+
+        {/* Dropdown preview */}
+        {data.questionType === 'dropdown' && data.options && (
+          <div className="border border-dashed border-muted-foreground/30 rounded-lg px-3 py-2 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground/50">
+              Select an option...
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/40" />
+          </div>
+        )}
+
+        {/* Date input preview */}
+        {data.questionType === 'date' && (
+          <div className="border border-dashed border-muted-foreground/30 rounded-lg px-3 py-2 flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground/40" />
+            <span className="text-sm text-muted-foreground/50">
+              {data.placeholder || 'Select a date...'}
+            </span>
+          </div>
+        )}
+
+        {/* NPS preview */}
+        {data.questionType === 'nps' && (
+          <div className="space-y-1">
+            <div className="flex gap-0.5">
+              {Array.from({ length: 11 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex-1 h-5 rounded text-[9px] font-medium flex items-center justify-center',
+                    i <= 6 ? 'bg-red-100 dark:bg-red-900/30 text-red-400' :
+                    i <= 8 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-500' :
+                    'bg-green-100 dark:bg-green-900/30 text-green-500'
+                  )}
+                >
+                  {i}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -22,6 +22,11 @@ import {
   ToggleLeft,
   Sparkles,
   GitBranch,
+  Hash,
+  Mail,
+  ChevronDown,
+  Calendar,
+  Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, useSelectedNode } from '@/presentation/stores/canvas.store';
@@ -73,6 +78,36 @@ const questionTypeConfig: Record<
     color: 'text-teal-500',
     bgColor: 'bg-teal-100 dark:bg-teal-900/30',
     label: 'Yes / No',
+  },
+  number: {
+    icon: Hash,
+    color: 'text-emerald-500',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    label: 'Number',
+  },
+  email: {
+    icon: Mail,
+    color: 'text-rose-500',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+    label: 'Email',
+  },
+  dropdown: {
+    icon: ChevronDown,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    label: 'Dropdown',
+  },
+  date: {
+    icon: Calendar,
+    color: 'text-sky-500',
+    bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+    label: 'Date',
+  },
+  nps: {
+    icon: Gauge,
+    color: 'text-lime-500',
+    bgColor: 'bg-lime-100 dark:bg-lime-900/30',
+    label: 'NPS Score',
   },
 };
 
@@ -319,11 +354,16 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
   const showOptions =
     data.questionType === 'multiple_choice_single' ||
     data.questionType === 'multiple_choice_multi' ||
-    data.questionType === 'yes_no';
+    data.questionType === 'yes_no' ||
+    data.questionType === 'dropdown';
 
   const showRating = data.questionType === 'rating';
   const showText =
     data.questionType === 'short_text' || data.questionType === 'long_text';
+  const showNumber = data.questionType === 'number';
+  const showEmail = data.questionType === 'email';
+  const showDate = data.questionType === 'date';
+  const showNps = data.questionType === 'nps';
 
   return (
     <div className="space-y-5">
@@ -526,6 +566,155 @@ const QuestionNodeEditor = memo(function QuestionNodeEditor({
             className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Enter your answer..."
           />
+        </div>
+      )}
+
+      {/* Number input settings */}
+      {showNumber && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-emerald-500" />
+            <label className="text-sm font-semibold text-foreground">
+              Number Settings
+            </label>
+          </div>
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Placeholder
+              </label>
+              <input
+                type="text"
+                value={data.placeholder || ''}
+                onChange={(e) =>
+                  updateNodeData(nodeId, { placeholder: e.target.value })
+                }
+                className="w-full px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Enter a number..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Min Value
+                </label>
+                <input
+                  type="number"
+                  value={data.minValue ?? ''}
+                  onChange={(e) =>
+                    updateNodeData(nodeId, {
+                      minValue: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Max Value
+                </label>
+                <input
+                  type="number"
+                  value={data.maxValue ?? ''}
+                  onChange={(e) =>
+                    updateNodeData(nodeId, {
+                      maxValue: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email input settings */}
+      {showEmail && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-rose-500" />
+            <label className="text-sm font-semibold text-foreground">
+              Email Settings
+            </label>
+          </div>
+          <input
+            type="text"
+            value={data.placeholder || ''}
+            onChange={(e) =>
+              updateNodeData(nodeId, { placeholder: e.target.value })
+            }
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+            placeholder="you@example.com"
+          />
+        </div>
+      )}
+
+      {/* Date settings */}
+      {showDate && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-sky-500" />
+            <label className="text-sm font-semibold text-foreground">
+              Date Settings
+            </label>
+          </div>
+          <input
+            type="text"
+            value={data.placeholder || ''}
+            onChange={(e) =>
+              updateNodeData(nodeId, { placeholder: e.target.value })
+            }
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+            placeholder="Select a date..."
+          />
+        </div>
+      )}
+
+      {/* NPS settings */}
+      {showNps && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-lime-500" />
+            <label className="text-sm font-semibold text-foreground">
+              NPS Scale Labels
+            </label>
+          </div>
+          <div className="p-3 rounded-xl bg-lime-50 dark:bg-lime-900/20 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Low Label (0)
+                </label>
+                <input
+                  type="text"
+                  value={data.minLabel || ''}
+                  onChange={(e) =>
+                    updateNodeData(nodeId, { minLabel: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-lg border border-lime-200 dark:border-lime-800 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-lime-500 text-sm"
+                  placeholder="Not likely"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  High Label (10)
+                </label>
+                <input
+                  type="text"
+                  value={data.maxLabel || ''}
+                  onChange={(e) =>
+                    updateNodeData(nodeId, { maxLabel: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-lg border border-lime-200 dark:border-lime-800 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-lime-500 text-sm"
+                  placeholder="Very likely"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              NPS uses a fixed 0-10 scale. Scores 0-6 are detractors, 7-8 passive, 9-10 promoters.
+            </p>
+          </div>
         </div>
       )}
 

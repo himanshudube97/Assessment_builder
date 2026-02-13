@@ -491,6 +491,91 @@ function QuestionScreen({
             className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors resize-none"
           />
         )}
+
+        {/* Number */}
+        {data.questionType === 'number' && (
+          <input
+            type="number"
+            value={(answer as number) ?? ''}
+            onChange={(e) => onAnswer(e.target.value ? Number(e.target.value) : '')}
+            placeholder={data.placeholder}
+            min={data.minValue}
+            max={data.maxValue}
+            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+          />
+        )}
+
+        {/* Email */}
+        {data.questionType === 'email' && (
+          <input
+            type="email"
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            placeholder={data.placeholder || 'you@example.com'}
+            className="w-full px-4 py-3 rounded-xl border-2 border-border bg-background focus:border-primary focus:outline-none transition-colors"
+          />
+        )}
+
+        {/* Dropdown */}
+        {data.questionType === 'dropdown' && data.options && (
+          <select
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            className={cn(
+              'w-full px-4 py-3 rounded-xl border-2 bg-background focus:outline-none transition-colors',
+              answer ? 'border-primary' : 'border-border'
+            )}
+          >
+            <option value="">Select an option...</option>
+            {data.options.map((option) => (
+              <option key={option.id} value={option.text}>
+                {option.text}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Date */}
+        {data.questionType === 'date' && (
+          <input
+            type="date"
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            className={cn(
+              'w-full px-4 py-3 rounded-xl border-2 bg-background focus:outline-none transition-colors',
+              answer ? 'border-primary' : 'border-border'
+            )}
+          />
+        )}
+
+        {/* NPS */}
+        {data.questionType === 'nps' && (
+          <div className="flex flex-col items-center gap-4 pt-4">
+            <div className="flex gap-1.5">
+              {Array.from({ length: 11 }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => onAnswer(i)}
+                  className={cn(
+                    'w-10 h-10 rounded-lg font-semibold text-sm transition-all',
+                    answer === i
+                      ? 'text-white scale-110'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                    answer === i && i <= 6 && 'bg-red-500',
+                    answer === i && i >= 7 && i <= 8 && 'bg-yellow-500',
+                    answer === i && i >= 9 && 'bg-green-500'
+                  )}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between w-full text-sm text-muted-foreground">
+              <span>{data.minLabel || 'Not likely'}</span>
+              <span>{data.maxLabel || 'Very likely'}</span>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

@@ -635,6 +635,104 @@ function QuestionScreen({
             }}
           />
         )}
+
+        {/* Number */}
+        {data.questionType === 'number' && (
+          <input
+            type="number"
+            value={(answer as number) ?? ''}
+            onChange={(e) => onAnswer(e.target.value ? Number(e.target.value) : '')}
+            placeholder={data.placeholder}
+            min={data.minValue}
+            max={data.maxValue}
+            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
+            style={{
+              borderColor: answer !== undefined && answer !== '' ? color : undefined,
+            }}
+          />
+        )}
+
+        {/* Email */}
+        {data.questionType === 'email' && (
+          <input
+            type="email"
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            placeholder={data.placeholder || 'you@example.com'}
+            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
+            style={{
+              borderColor: answer ? color : undefined,
+            }}
+          />
+        )}
+
+        {/* Dropdown */}
+        {data.questionType === 'dropdown' && data.options && (
+          <select
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
+            style={{
+              borderColor: answer ? color : undefined,
+            }}
+          >
+            <option value="">Select an option...</option>
+            {data.options.map((option) => (
+              <option key={option.id} value={option.text}>
+                {option.text}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Date */}
+        {data.questionType === 'date' && (
+          <input
+            type="date"
+            value={(answer as string) || ''}
+            onChange={(e) => onAnswer(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none transition-colors"
+            style={{
+              borderColor: answer ? color : undefined,
+            }}
+          />
+        )}
+
+        {/* NPS */}
+        {data.questionType === 'nps' && (
+          <div className="flex flex-col items-center gap-4 pt-4">
+            <div className="flex gap-1.5">
+              {Array.from({ length: 11 }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => onAnswer(i)}
+                  className={cn(
+                    'w-10 h-10 rounded-lg font-semibold text-sm transition-all',
+                    answer === i
+                      ? 'scale-110 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  )}
+                  style={{
+                    backgroundColor:
+                      answer === i
+                        ? i <= 6
+                          ? '#EF4444'
+                          : i <= 8
+                            ? '#EAB308'
+                            : '#22C55E'
+                        : undefined,
+                  }}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between w-full text-sm text-slate-500 dark:text-slate-400">
+              <span>{data.minLabel || 'Not likely'}</span>
+              <span>{data.maxLabel || 'Very likely'}</span>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
