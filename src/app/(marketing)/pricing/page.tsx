@@ -9,14 +9,14 @@ const plans = [
     name: 'Free',
     price: 0,
     period: 'forever',
-    description: 'Perfect for trying out FlowForm',
+    description: 'Perfect for trying out Assessio',
     features: [
       '3 assessments',
       '50 responses/month',
       'All 11 question types',
       'Visual flow builder',
       'Smart branching',
-      'FlowForm watermark',
+      'Assessio watermark',
     ],
     cta: 'Get Started',
     ctaHref: '/dashboard',
@@ -105,7 +105,7 @@ const faqs = [
   },
   {
     question: 'Is there a free trial?',
-    answer: 'Yes! You can start with our Free plan to try out FlowForm. When you\'re ready for more features, you can upgrade to Pro with a 14-day free trial.',
+    answer: 'Yes! You can start with our Free plan to try out Assessio. When you\'re ready for more features, you can upgrade to Pro with a 14-day free trial.',
   },
   {
     question: 'What question types are included?',

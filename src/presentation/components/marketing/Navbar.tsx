@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Workflow } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AssessioLogo } from '@/components/ui/logo';
 
 const navLinks = [
   { href: '/features', label: 'Features' },
@@ -36,9 +37,9 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-              <Workflow className="w-5 h-5 text-white" />
+              <AssessioLogo className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">FlowForm</span>
+            <span className="text-xl font-bold text-foreground">Assessio</span>
           </Link>
 
           {/* Desktop Navigation */}

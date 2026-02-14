@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Workflow } from 'lucide-react';
+import { AssessioLogo } from '@/components/ui/logo';
 
 const footerLinks = {
   product: [
@@ -23,9 +23,9 @@ export function Footer() {
           <div className="col-span-2 md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                <Workflow className="w-5 h-5 text-white" />
+                <AssessioLogo className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-foreground">FlowForm</span>
+              <span className="text-xl font-bold text-foreground">Assessio</span>
             </Link>
             <p className="text-muted-foreground max-w-xs">
               Visual assessment builder for everyone. Create surveys, quizzes, and forms that adapt to responses.
@@ -70,7 +70,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-12 pt-8 border-t border-border">
           <p className="text-muted-foreground text-sm text-center md:text-left">
-            &copy; {new Date().getFullYear()} FlowForm. All rights reserved.
+            &copy; {new Date().getFullYear()} Assessio. All rights reserved.
           </p>
         </div>
       </div>

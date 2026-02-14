@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'FlowForm - Visual Assessment Builder',
-    template: '%s | FlowForm',
+    default: 'Assessio - Visual Assessment Builder',
+    template: '%s | Assessio',
   },
   description:
     'Build dynamic assessments with visual branching logic. Create surveys, quizzes, and forms that adapt to responses.',
@@ -29,16 +29,16 @@ export const metadata: Metadata = {
     'quiz maker',
     'typeform alternative',
   ],
-  authors: [{ name: 'FlowForm' }],
+  authors: [{ name: 'Assessio' }],
   openGraph: {
-    title: 'FlowForm - Visual Assessment Builder',
+    title: 'Assessio - Visual Assessment Builder',
     description: 'Build assessments that actually branch',
     type: 'website',
-    siteName: 'FlowForm',
+    siteName: 'Assessio',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FlowForm - Visual Assessment Builder',
+    title: 'Assessio - Visual Assessment Builder',
     description: 'Build assessments that actually branch',
   },
   robots: {

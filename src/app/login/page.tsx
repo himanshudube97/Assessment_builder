@@ -8,7 +8,8 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2, Workflow } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { AssessioLogo } from '@/components/ui/logo';
 import { GoogleSignInButton } from '@/presentation/components/auth';
 
 function LoginForm() {
@@ -192,9 +193,9 @@ export default function LoginPage() {
         <div className="text-center">
           <Link href="/" className="inline-flex items-center justify-center gap-2 mb-6">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-              <Workflow className="w-6 h-6 text-white" />
+              <AssessioLogo className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">FlowForm</span>
+            <span className="text-2xl font-bold text-gray-900">Assessio</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="mt-2 text-sm text-gray-600">
