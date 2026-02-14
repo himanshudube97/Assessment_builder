@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // --- Configuration types ---
@@ -42,9 +42,9 @@ const TONE_OPTIONS: { value: AssessmentTone; label: string }[] = [
 ];
 
 const COMPLEXITY_OPTIONS: { value: AssessmentComplexity; label: string; desc: string }[] = [
-  { value: 'simple', label: 'Simple', desc: 'Linear flow, no branching' },
-  { value: 'moderate', label: 'Moderate', desc: 'Some conditional branching' },
-  { value: 'complex', label: 'Complex', desc: 'Multiple branches and paths' },
+  { value: 'simple', label: 'Linear', desc: 'No branching - sequential flow' },
+  { value: 'moderate', label: 'Normal', desc: '1-2 conditional branches' },
+  { value: 'complex', label: 'Complex', desc: 'Multiple branching paths' },
 ];
 
 const EXAMPLE_PROMPTS = [
@@ -110,9 +110,8 @@ export function AIGenerateModal({
   const [prompt, setPrompt] = useState('');
   const [length, setLength] = useState<AssessmentLength>('medium');
   const [tone, setTone] = useState<AssessmentTone>('professional');
-  const [complexity, setComplexity] = useState<AssessmentComplexity>('simple');
+  const [complexity, setComplexity] = useState<AssessmentComplexity>('moderate');
   const [includeScoring, setIncludeScoring] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -250,7 +249,7 @@ export function AIGenerateModal({
               </div>
             </div>
 
-            {/* Quick config: Length */}
+            {/* Length */}
             <PillSelect
               label="Length"
               options={LENGTH_OPTIONS}
@@ -259,67 +258,44 @@ export function AIGenerateModal({
               disabled={isGenerating || isFlowLocked}
             />
 
-            {/* Advanced toggle */}
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronDown
+            {/* Complexity */}
+            <PillSelect
+              label="Branching Complexity"
+              options={COMPLEXITY_OPTIONS}
+              value={complexity}
+              onChange={setComplexity}
+              disabled={isGenerating || isFlowLocked}
+            />
+
+            {/* Tone */}
+            <PillSelect
+              label="Tone"
+              options={TONE_OPTIONS}
+              value={tone}
+              onChange={setTone}
+              disabled={isGenerating || isFlowLocked}
+            />
+
+            {/* Scoring toggle */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                Scoring
+              </label>
+              <button
+                type="button"
+                onClick={() => setIncludeScoring(!includeScoring)}
+                disabled={isGenerating || isFlowLocked}
                 className={cn(
-                  'h-3.5 w-3.5 transition-transform',
-                  showAdvanced && 'rotate-180'
+                  'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  includeScoring
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-background text-muted-foreground border-border hover:border-violet-300'
                 )}
-              />
-              Advanced options
-            </button>
-
-            {/* Advanced options */}
-            {showAdvanced && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-4"
               >
-                <PillSelect
-                  label="Tone"
-                  options={TONE_OPTIONS}
-                  value={tone}
-                  onChange={setTone}
-                  disabled={isGenerating || isFlowLocked}
-                />
-
-                <PillSelect
-                  label="Complexity"
-                  options={COMPLEXITY_OPTIONS}
-                  value={complexity}
-                  onChange={setComplexity}
-                  disabled={isGenerating || isFlowLocked}
-                />
-
-                {/* Scoring toggle */}
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                    Scoring
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIncludeScoring(!includeScoring)}
-                    disabled={isGenerating || isFlowLocked}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
-                      'disabled:opacity-50 disabled:cursor-not-allowed',
-                      includeScoring
-                        ? 'bg-violet-600 text-white border-violet-600'
-                        : 'bg-background text-muted-foreground border-border hover:border-violet-300'
-                    )}
-                  >
-                    Include scoring & correct answers
-                  </button>
-                </div>
-              </motion.div>
-            )}
+                Include scoring & correct answers
+              </button>
+            </div>
 
             {/* Error message */}
             {error && (

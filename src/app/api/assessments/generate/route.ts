@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     const prompt = body.prompt;
     const length = body.length || 'medium';       // short | medium | detailed
     const tone = body.tone || 'professional';      // professional | casual | friendly | academic
-    const complexity = body.complexity || 'simple'; // simple | moderate | complex
+    const complexity = body.complexity || 'moderate'; // simple | moderate | complex
     const includeScoring = body.includeScoring === true;
 
     if (!prompt || typeof prompt !== 'string') {

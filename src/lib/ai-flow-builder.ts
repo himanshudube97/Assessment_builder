@@ -152,7 +152,7 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
     edges.push(createEdge(sourceId, targetId, condition));
   }
 
-  // 6. Auto-layout with dagre (left-to-right)
+  // 6. Auto-layout with dagre
   const rfNodes: Node[] = allNodes.map((n) => ({
     id: n.id,
     type: n.type,
@@ -166,10 +166,31 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
     sourceHandle: e.sourceHandle,
   }));
 
+  // Calculate complexity to determine spacing
+  const hasBranching = output.branching.length > 0;
+  const branchCount = output.branching.length;
+
+  // Adaptive spacing based on complexity:
+  // - Use TB (top-bottom) by default for better canvas space utilization
+  // - TB uses vertical screen space better than LR (screens are taller than wide)
+  // - Only use LR for very simple linear flows
+  const isSimpleLinear = !hasBranching && questionNodes.length <= 5;
+  const direction = isSimpleLinear ? 'LR' : 'TB';
+
+  // Generous spacing for readability:
+  // - TB: rankSep = vertical gap between rows, nodeSep = horizontal gap between nodes
+  // - LR: rankSep = horizontal gap between columns, nodeSep = vertical gap between nodes
+  const nodeSep = direction === 'TB'
+    ? 200 + (branchCount * 30)  // Horizontal spacing in TB layout
+    : 150 + (branchCount * 40); // Vertical spacing in LR layout
+  const rankSep = direction === 'TB'
+    ? 180  // Vertical spacing between rows
+    : 250; // Horizontal spacing between columns
+
   const layouted = getLayoutedElements(rfNodes, rfEdges, {
-    direction: 'LR',
-    rankSep: 100,
-    nodeSep: 60,
+    direction,
+    rankSep,
+    nodeSep,
   });
 
   // Map layouted positions back to domain nodes

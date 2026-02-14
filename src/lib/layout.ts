@@ -16,11 +16,11 @@ interface LayoutOptions {
 }
 
 const defaultOptions: Required<LayoutOptions> = {
-  direction: 'LR',
+  direction: 'TB',    // Top-bottom uses screen space better
   nodeWidth: 280,
   nodeHeight: 180,
-  rankSep: 80,
-  nodeSep: 50,
+  rankSep: 180,   // Generous spacing between ranks
+  nodeSep: 200,   // Generous spacing between nodes
 };
 
 interface TidyLayoutOptions {
@@ -187,6 +187,30 @@ export function tidyLayout<N extends Node>(
 }
 
 /**
+ * Expands layout by multiplying spacing between nodes
+ * Useful for utilizing more canvas space
+ */
+function expandLayout<N extends Node>(
+  nodes: N[],
+  expansionFactor: number = 1.5
+): N[] {
+  if (nodes.length === 0) return nodes;
+
+  // Find the centroid of all nodes
+  const centroidX = nodes.reduce((sum, n) => sum + n.position.x, 0) / nodes.length;
+  const centroidY = nodes.reduce((sum, n) => sum + n.position.y, 0) / nodes.length;
+
+  // Expand each node's position away from centroid
+  return nodes.map((node) => ({
+    ...node,
+    position: {
+      x: centroidX + (node.position.x - centroidX) * expansionFactor,
+      y: centroidY + (node.position.y - centroidY) * expansionFactor,
+    },
+  }));
+}
+
+/**
  * Applies dagre layout to nodes and edges
  * Returns new nodes with updated positions
  */
@@ -224,7 +248,7 @@ export function getLayoutedElements<N extends Node, E extends Edge>(
   dagre.layout(dagreGraph);
 
   // Apply the calculated positions to nodes
-  const layoutedNodes = nodes.map((node) => {
+  let layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
     return {
       ...node,
@@ -235,6 +259,10 @@ export function getLayoutedElements<N extends Node, E extends Edge>(
       },
     };
   });
+
+  // Expand layout for better canvas space utilization
+  // This spreads nodes out 1.5x for more breathing room
+  layoutedNodes = expandLayout(layoutedNodes, 1.5);
 
   return { nodes: layoutedNodes, edges };
 }
