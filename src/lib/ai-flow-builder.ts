@@ -117,22 +117,17 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
 
     if (!sourceId || !targetId) continue;
 
-    // Skip if this edge duplicates an existing linear edge
-    const duplicate = edges.some(
-      (e) => e.source === sourceId && e.target === targetId && !e.condition
+    // Skip if an edge with this source→target already exists
+    const existing = edges.find(
+      (e) => e.source === sourceId && e.target === targetId
     );
-    if (duplicate) {
-      // Update the existing edge with the condition instead of adding a duplicate
-      const existing = edges.find(
-        (e) => e.source === sourceId && e.target === targetId && !e.condition
-      );
-      if (existing) {
-        existing.condition = {
-          type: branch.condition as ConditionType,
-          value: branch.value,
-        };
-        continue;
-      }
+    if (existing) {
+      // Update the existing edge's condition instead of adding a duplicate
+      existing.condition = {
+        type: branch.condition as ConditionType,
+        value: branch.value,
+      };
+      continue;
     }
 
     const condition: EdgeCondition = {

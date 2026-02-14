@@ -150,8 +150,9 @@ export function generateNodeId(type: NodeType): string {
   return `${type}-${Date.now()}-${nodeIdCounter}`;
 }
 
+let edgeIdCounter = 0;
 export function generateEdgeId(source: string, target: string): string {
-  return `edge-${source}-${target}-${Date.now()}`;
+  return `edge-${source}-${target}-${Date.now()}-${edgeIdCounter++}`;
 }
 
 export function createStartNode(position: Position): FlowNode {
