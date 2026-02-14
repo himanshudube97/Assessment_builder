@@ -60,7 +60,10 @@ export const BaseNode = memo(function BaseNode({
   const openConnectionMenu = useCanvasStore((s) => s.openConnectionMenu);
   const closeConnectionMenu = useCanvasStore((s) => s.closeConnectionMenu);
   const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
+  const layoutDirection = useCanvasStore((s) => s.layoutDirection);
   const atOptionLimit = useIsNodeAtOptionLimit(id);
+
+  const isTB = layoutDirection === 'TB';
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -131,13 +134,14 @@ export const BaseNode = memo(function BaseNode({
       {/* Body - overflow-visible allows handles to extend outside */}
       <div className="p-4 overflow-visible">{children}</div>
 
-      {/* Target Handle - Improved */}
+      {/* Target Handle - position flips with layout direction */}
       {showTargetHandle && (
         <Handle
           type="target"
-          position={Position.Left}
+          position={isTB ? Position.Top : Position.Left}
           className={cn(
-            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-left-2',
+            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background',
+            isTB ? '!-top-2' : '!-left-2',
             '!transition-all !duration-200',
             'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
             selected && '!bg-primary'
@@ -150,9 +154,10 @@ export const BaseNode = memo(function BaseNode({
         <>
           <Handle
             type="source"
-            position={Position.Right}
+            position={isTB ? Position.Bottom : Position.Right}
             className={cn(
-              '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-right-2',
+              '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background',
+              isTB ? '!-bottom-2' : '!-right-2',
               '!transition-all !duration-200',
               'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
               selected && '!bg-primary'
@@ -162,11 +167,15 @@ export const BaseNode = memo(function BaseNode({
           {!isFlowLocked && !atOptionLimit && (
             <button
               className={cn(
-                'nodrag absolute -right-4 top-1/2 translate-x-full -translate-y-1/2',
-                'w-7 h-7 rounded-full flex items-center justify-center',
-                'bg-primary text-primary-foreground shadow-md',
+                'nodrag absolute',
+                isTB
+                  ? '-bottom-4 left-1/2 translate-y-full -translate-x-1/2'
+                  : '-right-4 top-1/2 translate-x-full -translate-y-1/2',
+                'w-9 h-9 rounded-full flex items-center justify-center',
+                'bg-primary text-primary-foreground shadow-lg',
                 'border-2 border-background',
                 'transition-all duration-200 ease-out',
+                'hover:scale-110 hover:shadow-xl active:scale-95',
                 (selected || showConnectionMenu)
                   ? 'opacity-100 scale-100'
                   : 'opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100',
@@ -180,13 +189,18 @@ export const BaseNode = memo(function BaseNode({
                 }
               }}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4 stroke-[2.5]" />
             </button>
           )}
           {/* Connection Menu */}
           <AnimatePresence>
             {showConnectionMenu && (
-              <div className="nodrag nopan absolute -right-4 top-1/2 translate-x-full mt-5 z-50">
+              <div className={cn(
+                'nodrag nopan absolute z-50',
+                isTB
+                  ? '-bottom-4 left-1/2 translate-y-full mt-5 -translate-x-1/2'
+                  : '-right-4 top-1/2 translate-x-full mt-5'
+              )}>
                 <ConnectionMenu sourceNodeId={id} onClose={closeConnectionMenu} />
               </div>
             )}

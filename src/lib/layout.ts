@@ -29,6 +29,7 @@ interface TidyLayoutOptions {
   minGapX?: number;
   minGapY?: number;
   gridSize?: number;
+  direction?: 'LR' | 'TB';
 }
 
 const defaultTidyOptions: Required<TidyLayoutOptions> = {
@@ -37,6 +38,7 @@ const defaultTidyOptions: Required<TidyLayoutOptions> = {
   minGapX: 40,
   minGapY: 40,
   gridSize: 20,
+  direction: 'LR',
 };
 
 /**
@@ -86,7 +88,8 @@ export function tidyLayout<N extends Node>(
   if (nodes.length === 0) return nodes;
 
   const opts = { ...defaultTidyOptions, ...options };
-  const { nodeWidth, nodeHeight, minGapX, minGapY, gridSize } = opts;
+  const { nodeWidth, nodeHeight, minGapX, minGapY, gridSize, direction } = opts;
+  const isTB = direction === 'TB';
 
   // Create a mutable copy of positions
   const positions = nodes.map((node) => ({
@@ -95,11 +98,17 @@ export function tidyLayout<N extends Node>(
     y: node.position.y,
   }));
 
-  // Sort by X position (left to right), then Y (top to bottom)
-  // This ensures we process nodes in reading order for LR layout
+  // Sort nodes in reading order based on direction
+  // LR: sort by X then Y (left to right, top to bottom)
+  // TB: sort by Y then X (top to bottom, left to right)
   const sortedIndices = positions
     .map((_, i) => i)
     .sort((a, b) => {
+      if (isTB) {
+        const yDiff = positions[a].y - positions[b].y;
+        if (Math.abs(yDiff) > nodeHeight / 2) return yDiff;
+        return positions[a].x - positions[b].x;
+      }
       const xDiff = positions[a].x - positions[b].x;
       if (Math.abs(xDiff) > nodeWidth / 2) return xDiff;
       return positions[a].y - positions[b].y;
@@ -122,14 +131,20 @@ export function tidyLayout<N extends Node>(
         const overlapX = prev.x + nodeWidth + minGapX - current.x;
         const overlapY = prev.y + nodeHeight + minGapY - current.y;
 
-        // Push in the direction that requires less movement
-        // Prefer pushing right/down to maintain reading order for LR layout
-        if (overlapX > 0 && overlapX <= overlapY) {
-          // Push right
-          current.x = prev.x + nodeWidth + minGapX;
-        } else if (overlapY > 0) {
-          // Push down
-          current.y = prev.y + nodeHeight + minGapY;
+        if (isTB) {
+          // TB: prefer pushing down, then right
+          if (overlapY > 0 && overlapY <= overlapX) {
+            current.y = prev.y + nodeHeight + minGapY;
+          } else if (overlapX > 0) {
+            current.x = prev.x + nodeWidth + minGapX;
+          }
+        } else {
+          // LR: prefer pushing right, then down
+          if (overlapX > 0 && overlapX <= overlapY) {
+            current.x = prev.x + nodeWidth + minGapX;
+          } else if (overlapY > 0) {
+            current.y = prev.y + nodeHeight + minGapY;
+          }
         }
       }
     }

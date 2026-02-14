@@ -152,7 +152,9 @@ export function generateNodeId(type: NodeType): string {
 
 let edgeIdCounter = 0;
 export function generateEdgeId(source: string, target: string): string {
-  return `edge-${source}-${target}-${Date.now()}-${edgeIdCounter++}`;
+  edgeIdCounter++;
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `edge-${source}-${target}-${edgeIdCounter}-${rand}`;
 }
 
 export function createStartNode(position: Position): FlowNode {

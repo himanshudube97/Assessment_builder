@@ -24,7 +24,7 @@ import {
   createEndNode,
   generateEdgeId,
 } from '@/domain/entities/flow';
-import { tidyLayout } from '@/lib/layout';
+import { tidyLayout, getLayoutedElements } from '@/lib/layout';
 
 // Types that get auto-assigned conditions per option (no manual condition editing)
 const OPTION_BASED_TYPES = new Set([
@@ -143,6 +143,9 @@ interface CanvasState {
   // Search/filter state — null means no search active
   searchHighlightIds: string[] | null;
 
+  // Layout direction preference
+  layoutDirection: 'LR' | 'TB';
+
   // Derived: true when status is not 'draft' (flow structure is locked)
   isFlowLocked: boolean;
 
@@ -194,6 +197,8 @@ interface CanvasState {
 
   // Layout
   autoLayout: () => void;
+  fullLayout: (direction?: 'LR' | 'TB', spacing?: 'compact' | 'comfortable' | 'spacious') => void;
+  setLayoutDirection: (dir: 'LR' | 'TB') => void;
 
   // Spotlight mode
   clearNewlyAddedNode: () => void;
@@ -285,6 +290,7 @@ const initialState = {
   newlyAddedNodeId: null,
   connectionMenuSourceId: null,
   searchHighlightIds: null,
+  layoutDirection: 'LR' as const,
   isFlowLocked: false,
 };
 
@@ -391,6 +397,14 @@ export const useCanvasStore = create<CanvasState>()(
                 });
               }
             }
+
+            // Deduplicate edges by ID (old generateEdgeId could produce collisions)
+            const seenIds = new Set<string>();
+            rfEdges = rfEdges.filter((e) => {
+              if (seenIds.has(e.id)) return false;
+              seenIds.add(e.id);
+              return true;
+            });
 
             set({
               nodes: rfNodes,
@@ -565,6 +579,41 @@ export const useCanvasStore = create<CanvasState>()(
               gridSize: 20,
             });
             set({ nodes: tidiedNodes, isDirty: true });
+          },
+
+          fullLayout: (direction, spacing = 'comfortable') => {
+            if (get().isFlowLocked) return;
+            const state = get();
+            const dir = direction || state.layoutDirection;
+            const isTB = dir === 'TB';
+            const maxOutgoing = Math.max(1, ...state.nodes.map(
+              (n) => state.edges.filter((e) => e.source === n.id).length
+            ));
+            // TB needs more nodeSep (horizontal gap between siblings) since nodes are wide
+            const spacingConfig = {
+              compact:     { rankSep: isTB ? 180 : 160, baseNodeSep: isTB ? 120 : 100,  multiplier: isTB ? 50 : 40 },
+              comfortable: { rankSep: isTB ? 260 : 240, baseNodeSep: isTB ? 180 : 160,  multiplier: isTB ? 70 : 60 },
+              spacious:    { rankSep: isTB ? 340 : 320, baseNodeSep: isTB ? 240 : 220,  multiplier: isTB ? 90 : 80 },
+            }[spacing];
+            const { nodes: layoutedNodes } = getLayoutedElements(
+              state.nodes, state.edges, {
+                direction: dir,
+                rankSep: spacingConfig.rankSep,
+                nodeSep: Math.max(spacingConfig.baseNodeSep, maxOutgoing * spacingConfig.multiplier),
+              }
+            );
+            set({ nodes: layoutedNodes, isDirty: true });
+          },
+
+          setLayoutDirection: (dir) => {
+            const state = get();
+            const savedEdges = state.edges;
+            // Clear edges, update direction, then restore edges to force React Flow recalculation
+            set({ edges: [], layoutDirection: dir });
+            setTimeout(() => {
+              set({ edges: savedEdges });
+              get().fullLayout(dir);
+            }, 50);
           },
 
           clearNewlyAddedNode: () => {

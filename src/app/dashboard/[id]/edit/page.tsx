@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
 import { useCanvasStore, canvasUndo, canvasRedo, canvasClearHistory } from '@/presentation/stores/canvas.store';
 import {
   FlowCanvas,
-  CanvasSidebar,
   NodeEditorPanel,
 } from '@/presentation/components/canvas';
 import { PreviewModal } from '@/presentation/components/preview';
@@ -37,7 +36,6 @@ import { AIGenerateModal } from '@/presentation/components/ai-generate';
 import type { AIGenerateConfig } from '@/presentation/components/ai-generate';
 import type { PublishSettings } from '@/presentation/components/publish/PublishModal';
 import type { AssessmentSettings } from '@/domain/entities/assessment';
-import type { QuestionType } from '@/domain/entities/flow';
 
 interface EditorPageProps {
   params: Promise<{ id: string }>;
@@ -56,8 +54,6 @@ export default function EditorPage({ params }: EditorPageProps) {
     closeAt,
     responseCount,
     settings,
-    nodes,
-    edges,
     isDirty,
     isSaving,
     lastSavedAt,
@@ -67,8 +63,6 @@ export default function EditorPage({ params }: EditorPageProps) {
     updateTitle,
     updateDescription,
     loadCanvas,
-    addQuestionNode,
-    addNode,
     markSaved,
     setSaving,
     getFlowData,
@@ -317,90 +311,6 @@ export default function EditorPage({ params }: EditorPageProps) {
     }
     setIsEditingTitle(false);
   }, [editableTitle, title, updateTitle]);
-
-  // Get selected node from store
-  const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
-
-  // Calculate smart position for new nodes
-  const calculateSmartPosition = useCallback(() => {
-    const NODE_WIDTH = 280;
-    const NODE_HEIGHT = 180;
-    const SPACING_X = 60;
-
-    // Helper to check if position overlaps with any existing node
-    const hasOverlap = (x: number, y: number) => {
-      return nodes.some((n) => {
-        const dx = Math.abs(n.position.x - x);
-        const dy = Math.abs(n.position.y - y);
-        return dx < NODE_WIDTH + 20 && dy < NODE_HEIGHT + 20;
-      });
-    };
-
-    // Helper to find non-overlapping position
-    const findNonOverlappingPosition = (baseX: number, baseY: number) => {
-      let x = baseX;
-      let y = baseY;
-      let attempts = 0;
-
-      while (hasOverlap(x, y) && attempts < 10) {
-        x += NODE_WIDTH + SPACING_X;
-        attempts++;
-      }
-      return { x, y };
-    };
-
-    // If a node is selected, place to the right of it
-    if (selectedNodeId) {
-      const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-      if (selectedNode) {
-        return findNonOverlappingPosition(
-          selectedNode.position.x + NODE_WIDTH + SPACING_X,
-          selectedNode.position.y
-        );
-      }
-    }
-
-    // No selection - calculate center of existing nodes and place to the right
-    if (nodes.length > 0) {
-      // Calculate bounding box
-      let minY = Infinity, maxY = -Infinity;
-      let maxX = -Infinity;
-
-      nodes.forEach((n) => {
-        minY = Math.min(minY, n.position.y);
-        maxY = Math.max(maxY, n.position.y + NODE_HEIGHT);
-        maxX = Math.max(maxX, n.position.x + NODE_WIDTH);
-      });
-
-      // Place at vertical center, to the right of all nodes
-      const centerY = minY + (maxY - minY) / 2 - NODE_HEIGHT / 2;
-      const newX = maxX + SPACING_X;
-
-      return findNonOverlappingPosition(newX, centerY);
-    }
-
-    // No nodes exist - place at a default starting position
-    return { x: 300, y: 200 };
-  }, [nodes, selectedNodeId]);
-
-  // Handle adding nodes from sidebar
-  const handleAddNode = useCallback(
-    (
-      type: 'question' | 'end',
-      position?: { x: number; y: number },
-      questionType?: QuestionType
-    ) => {
-      // Use provided position (from drag/drop) or calculate smart position
-      const pos = position || calculateSmartPosition();
-
-      if (type === 'question' && questionType) {
-        addQuestionNode(questionType, pos);
-      } else {
-        addNode(type, pos);
-      }
-    },
-    [calculateSmartPosition, addQuestionNode, addNode]
-  );
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -662,18 +572,8 @@ export default function EditorPage({ params }: EditorPageProps) {
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <CanvasSidebar
-          onAddNode={(type, questionType) => handleAddNode(type, undefined, questionType)}
-          disabled={isFlowLocked}
-        />
-
         {/* Canvas */}
-        <FlowCanvas
-          onAddNode={(type, position, questionType) =>
-            handleAddNode(type, position, questionType)
-          }
-        />
+        <FlowCanvas />
 
         {/* Editor Panel */}
         <NodeEditorPanel />

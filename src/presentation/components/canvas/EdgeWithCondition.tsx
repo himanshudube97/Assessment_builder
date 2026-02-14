@@ -75,12 +75,13 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const hasSiblingConditions = data?.hasSiblingConditions ?? false;
   const isOptionBased = data?.isOptionBased ?? false;
 
-  // Edge colors with better visual hierarchy
-  const strokeColor = hasCondition
-    ? '#8B5CF6' // violet-500
-    : selected || isHovered
-      ? '#6366F1' // indigo-500
-      : '#CBD5E1'; // slate-300
+  // Edge colors: grey by default, blue on hover/select
+  const isActive = selected || isHovered;
+  const strokeColor = isActive
+    ? hasCondition
+      ? '#8B5CF6' // violet-500
+      : '#6366F1' // indigo-500
+    : '#CBD5E1'; // slate-300
 
   const glowColor = hasCondition
     ? 'rgba(139, 92, 246, 0.3)'
@@ -103,8 +104,8 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
         />
       )}
 
-      {/* Animated flow dots */}
-      {(selected || isHovered || hasCondition) && (
+      {/* Animated flow dots — only on hover/select */}
+      {isActive && (
         <circle r="3" fill={strokeColor}>
           <animateMotion
             dur="1.5s"
@@ -117,7 +118,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
       {/* Main edge path */}
       <BaseEdge
         path={edgePath}
-        markerEnd={`url(#arrow-${hasCondition ? 'condition' : selected ? 'selected' : 'default'})`}
+        markerEnd={`url(#arrow-${isActive ? (hasCondition ? 'condition' : 'selected') : 'default'})`}
         style={{
           ...style,
           strokeWidth: selected || isHovered ? 2.5 : 2,

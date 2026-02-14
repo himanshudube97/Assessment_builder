@@ -12,11 +12,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
   Flag,
-  HelpCircle,
   ChevronRight,
   ArrowLeft,
   AlertCircle,
   GitBranch,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -34,7 +34,6 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const edgeConditionMap = useCanvasStore((s) => s.edgeConditionMap);
-  const onConnect = useCanvasStore((s) => s.onConnect);
   const addNodeWithEdge = useCanvasStore((s) => s.addNodeWithEdge);
 
   // Source node info
@@ -122,17 +121,6 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose, phase, showConditionPicker]);
 
-  // Connectable targets: question + end nodes, excluding self and already-connected targets
-  const connectedTargets = new Set(
-    edges.filter((e) => e.source === sourceNodeId).map((e) => e.target)
-  );
-
-  const connectableNodes = nodes.filter((n) => {
-    if (n.id === sourceNodeId) return false;
-    if (n.type === 'start') return false;
-    if (connectedTargets.has(n.id)) return false;
-    return true;
-  });
 
   // Single-select: pick one option
   const handleSelectOption = (condition: EdgeCondition | null) => {
@@ -180,30 +168,9 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
     setPhase('main');
   };
 
-  const handleConnectExisting = (targetNodeId: string) => {
-    onConnect(
-      { source: sourceNodeId, target: targetNodeId, sourceHandle: null, targetHandle: null },
-      selectedCondition,
-    );
-    onClose();
-  };
-
   const handleCreateNew = (type: 'question' | 'end', questionType?: QuestionType) => {
     addNodeWithEdge(type, sourceNodeId, questionType, selectedCondition);
     onClose();
-  };
-
-  const getNodeLabel = (node: typeof nodes[0]) => {
-    if (node.type === 'end') {
-      return (node.data as { title?: string })?.title || 'End Screen';
-    }
-    const data = node.data as QuestionNodeData;
-    return data?.questionText || 'Untitled question';
-  };
-
-  const getNodeTypeIcon = (node: typeof nodes[0]) => {
-    if (node.type === 'end') return <Flag className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />;
-    return <HelpCircle className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />;
   };
 
   // Label for the selected condition shown in the main menu header
@@ -225,10 +192,11 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
       exit={{ opacity: 0, y: -8, scale: 0.95 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        'w-64 rounded-xl bg-card border border-border shadow-xl overflow-hidden',
-        'nodrag nopan'
+        'w-72 rounded-xl bg-card border border-border/60 shadow-2xl ring-1 ring-black/5 overflow-hidden',
+        'nodrag nopan nowheel'
       )}
       onClick={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
     >
       {/* Edge limit warning */}
       {atTotalLimit && (
@@ -250,10 +218,13 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.12 }}
           >
-            <div className="px-3 pt-3 pb-1.5">
+            <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Route by option
               </span>
+              <button onClick={onClose} className="p-0.5 rounded hover:bg-muted transition-colors">
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
             </div>
             <div className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
               {isSingleSelect ? (
@@ -354,11 +325,14 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Question type
               </span>
+              <button onClick={onClose} className="p-0.5 rounded hover:bg-muted transition-colors">
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
             </div>
-            <div className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
+            <div className="max-h-105 overflow-y-auto px-1.5 pb-1.5">
               {QUESTION_TYPES_LIST.map(([type, meta]) => {
                 const Icon = meta.icon;
                 return (
@@ -366,12 +340,20 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
                     key={type}
                     onClick={() => handleCreateNew('question', type)}
                     className={cn(
-                      'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
+                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-left',
                       'hover:bg-muted transition-colors',
                     )}
                   >
-                    <span className={cn('flex-shrink-0', meta.color)}><Icon className="h-3.5 w-3.5" /></span>
-                    <span className="text-foreground">{meta.label}</span>
+                    <span className={cn(
+                      'shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
+                      meta.bgColor,
+                    )}>
+                      <Icon className={cn('h-4 w-4', meta.color)} />
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium text-foreground">{meta.label}</span>
+                      <span className="text-[11px] text-muted-foreground truncate">{meta.description}</span>
+                    </div>
                   </button>
                 );
               })}
@@ -386,52 +368,34 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.12 }}
           >
-            {/* Show selected condition label */}
-            {conditionLabel && (
-              <div className="px-3 pt-3 pb-1.5 flex items-center gap-2">
+            {/* Header with optional condition label */}
+            <div className="px-3 pt-3 pb-1.5 flex items-center gap-2">
+              {conditionLabel && (
                 <button
                   onClick={() => setPhase('option-pick')}
                   className="p-0.5 rounded hover:bg-muted transition-colors"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
+              )}
+              {conditionLabel ? (
                 <span className={cn(
-                  'text-xs font-medium px-2 py-0.5 rounded-full',
+                  'flex-1 text-xs font-medium px-2 py-0.5 rounded-full w-fit',
                   selectedCondition
                     ? 'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300'
                     : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
                 )}>
                   {conditionLabel}
                 </span>
-              </div>
-            )}
-
-            {/* Existing nodes */}
-            {connectableNodes.length > 0 && !atTotalLimit && (
-              <>
-                <div className="px-3 pt-3 pb-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Connect to
-                  </span>
-                </div>
-                <div className="max-h-48 overflow-y-auto px-1.5 pb-1.5">
-                  {connectableNodes.map((node) => (
-                    <button
-                      key={node.id}
-                      onClick={() => handleConnectExisting(node.id)}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
-                        'hover:bg-muted transition-colors'
-                      )}
-                    >
-                      {getNodeTypeIcon(node)}
-                      <span className="truncate text-foreground">{getNodeLabel(node)}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="border-t border-border" />
-              </>
-            )}
+              ) : (
+                <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Connect to
+                </span>
+              )}
+              <button onClick={onClose} className="p-0.5 rounded hover:bg-muted transition-colors">
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
 
             {/* Create new */}
             {!atTotalLimit && (
