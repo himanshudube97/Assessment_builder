@@ -25,6 +25,7 @@ interface BaseNodeProps {
   showTargetHandle?: boolean;
   headerColor?: string;
   borderColor?: string;
+  dataTour?: string;
 }
 
 // Colorful header backgrounds
@@ -52,6 +53,7 @@ export const BaseNode = memo(function BaseNode({
   showTargetHandle = true,
   headerColor,
   borderColor,
+  dataTour,
 }: BaseNodeProps) {
   const selectNode = useCanvasStore((s) => s.selectNode);
   const deleteNode = useCanvasStore((s) => s.deleteNode);
@@ -100,6 +102,7 @@ export const BaseNode = memo(function BaseNode({
         isDimmedBySearch && 'opacity-[0.15] pointer-events-none'
       )}
       onClick={handleClick}
+      data-tour={dataTour}
     >
       {/* Header */}
       <div
@@ -166,6 +169,7 @@ export const BaseNode = memo(function BaseNode({
           {/* "+" button — visible on hover/select, hidden when locked or at option limit */}
           {!isFlowLocked && !atOptionLimit && (
             <button
+              data-tour="node-connect-hint"
               className={cn(
                 'nodrag absolute',
                 isTB

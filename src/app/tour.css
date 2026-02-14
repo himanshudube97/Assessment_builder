@@ -1,0 +1,179 @@
+/**
+ * Custom styles for Driver.js tour
+ * Matches the app's theme and design system
+ */
+
+/* ========================================
+   Driver.js Base Styles
+   ======================================== */
+.driver-active .driver-overlay,.driver-active *{pointer-events:none}.driver-active .driver-active-element,.driver-active .driver-active-element *,.driver-popover,.driver-popover *{pointer-events:auto}@keyframes animate-fade-in{0%{opacity:0}to{opacity:1}}.driver-fade .driver-overlay{animation:animate-fade-in .2s ease-in-out}.driver-fade .driver-popover{animation:animate-fade-in .2s}.driver-popover{all:unset;box-sizing:border-box;color:#2d2d2d;margin:0;padding:15px;border-radius:5px;min-width:250px;max-width:300px;box-shadow:0 1px 10px #0006;z-index:1000000000;position:fixed;top:0;right:0;background-color:#fff}.driver-popover *{font-family:Helvetica Neue,Inter,ui-sans-serif,"Apple Color Emoji",Helvetica,Arial,sans-serif}.driver-popover-title{font:19px/normal sans-serif;font-weight:700;display:block;position:relative;line-height:1.5;zoom:1;margin:0}.driver-popover-close-btn{all:unset;position:absolute;top:0;right:0;width:32px;height:28px;cursor:pointer;font-size:18px;font-weight:500;color:#d2d2d2;z-index:1;text-align:center;transition:color;transition-duration:.2s}.driver-popover-close-btn:hover,.driver-popover-close-btn:focus{color:#2d2d2d}.driver-popover-title[style*=block]+.driver-popover-description{margin-top:5px}.driver-popover-description{margin-bottom:0;font:14px/normal sans-serif;line-height:1.5;font-weight:400;zoom:1}.driver-popover-footer{margin-top:15px;text-align:right;zoom:1;display:flex;align-items:center;justify-content:space-between}.driver-popover-progress-text{font-size:13px;font-weight:400;color:#727272;zoom:1}.driver-popover-footer button{all:unset;display:inline-block;box-sizing:border-box;padding:3px 7px;text-decoration:none;text-shadow:1px 1px 0 #fff;background-color:#fff;color:#2d2d2d;font:12px/normal sans-serif;cursor:pointer;outline:0;zoom:1;line-height:1.3;border:1px solid #ccc;border-radius:3px}.driver-popover-footer .driver-popover-btn-disabled{opacity:.5;pointer-events:none}:not(body):has(>.driver-active-element){overflow:hidden!important}.driver-no-interaction,.driver-no-interaction *{pointer-events:none!important}.driver-popover-footer button:hover,.driver-popover-footer button:focus{background-color:#f7f7f7}.driver-popover-navigation-btns{display:flex;flex-grow:1;justify-content:flex-end}.driver-popover-navigation-btns button+button{margin-left:4px}.driver-popover-arrow{content:"";position:absolute;border:5px solid #fff}.driver-popover-arrow-side-over{display:none}.driver-popover-arrow-side-left{left:100%;border-right-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-right{right:100%;border-left-color:transparent;border-bottom-color:transparent;border-top-color:transparent}.driver-popover-arrow-side-top{top:100%;border-right-color:transparent;border-bottom-color:transparent;border-left-color:transparent}.driver-popover-arrow-side-bottom{bottom:100%;border-left-color:transparent;border-top-color:transparent;border-right-color:transparent}.driver-popover-arrow-side-center{display:none}.driver-popover-arrow-side-left.driver-popover-arrow-align-start,.driver-popover-arrow-side-right.driver-popover-arrow-align-start{top:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-start,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-start{left:15px}.driver-popover-arrow-align-end.driver-popover-arrow-side-left,.driver-popover-arrow-align-end.driver-popover-arrow-side-right{bottom:15px}.driver-popover-arrow-side-top.driver-popover-arrow-align-end,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-end{right:15px}.driver-popover-arrow-side-left.driver-popover-arrow-align-center,.driver-popover-arrow-side-right.driver-popover-arrow-align-center{top:50%;margin-top:-5px}.driver-popover-arrow-side-top.driver-popover-arrow-align-center,.driver-popover-arrow-side-bottom.driver-popover-arrow-align-center{left:50%;margin-left:-5px}.driver-popover-arrow-none{display:none}
+
+/* ========================================
+   Custom Theme Overrides
+   ======================================== */
+
+/* Popover styling */
+.flowform-tour-popover .driver-popover {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  padding: 0;
+  max-width: 360px;
+}
+
+/* Header */
+.flowform-tour-popover .driver-popover-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  padding: 16px 16px 8px;
+  margin: 0;
+}
+
+/* Description */
+.flowform-tour-popover .driver-popover-description {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: hsl(var(--muted-foreground));
+  padding: 0 16px 16px;
+  margin: 0;
+}
+
+/* Arrow */
+.flowform-tour-popover .driver-popover-arrow {
+  display: none; /* Cleaner look without arrow */
+}
+
+/* Footer */
+.flowform-tour-popover .driver-popover-footer {
+  padding: 12px 16px;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Progress text */
+.flowform-tour-popover .driver-popover-progress-text {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+
+/* Buttons */
+.flowform-tour-popover .driver-popover-btn {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+/* Next/Done button */
+.flowform-tour-popover .driver-popover-next-btn {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.flowform-tour-popover .driver-popover-next-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Previous button */
+.flowform-tour-popover .driver-popover-prev-btn {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.flowform-tour-popover .driver-popover-prev-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+/* Close button */
+.flowform-tour-popover .driver-popover-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.flowform-tour-popover .driver-popover-close-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+/* Overlay */
+.driver-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+/* Highlighted element */
+.driver-active-element {
+  z-index: 9999 !important;
+}
+
+/* Keyboard shortcut styling in descriptions */
+.flowform-tour-popover kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+/* List styling in tour steps */
+.flowform-tour-popover ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+}
+
+.flowform-tour-popover li {
+  margin: 0.375rem 0;
+  line-height: 1.5;
+}
+
+.flowform-tour-popover strong {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+/* Animate the popover entrance */
+.driver-popover {
+  animation: driverPopoverIn 0.2s ease-out;
+}
+
+@keyframes driverPopoverIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

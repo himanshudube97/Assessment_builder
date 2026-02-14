@@ -18,11 +18,12 @@ import ReactFlow, {
   type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid, Undo2, Redo2, Search, ArrowRight, ArrowDown, Plus, Flag, ChevronUp, ChevronDown, Rows3 } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2, Search, ArrowRight, ArrowDown, Plus, Flag, ChevronDown, Rows3, HelpCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 import { useCanvasStore, canvasUndo, canvasRedo, OPTION_BASED_TYPES } from '@/presentation/stores/canvas.store';
+import { useFlowTour } from '@/presentation/hooks/useFlowTour';
 import { StartNode } from './StartNode';
 import { QuestionNode } from './QuestionNode';
 import { EndNode } from './EndNode';
@@ -113,6 +114,9 @@ function FlowCanvasInner() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
 
+  // Tour integration
+  const { startTour, hasCompletedTour, isReady } = useFlowTour();
+
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -145,6 +149,17 @@ function FlowCanvasInner() {
     window.addEventListener('keydown', handleSearchKey);
     return () => window.removeEventListener('keydown', handleSearchKey);
   }, []);
+
+  // Auto-start tour for first-time users
+  useEffect(() => {
+    if (isReady && !hasCompletedTour && nodes.length <= 1) {
+      // Small delay to let the canvas render
+      const timer = setTimeout(() => {
+        startTour();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isReady, hasCompletedTour, startTour, nodes.length]);
 
   // Auto-dismiss node highlight after a short delay
   useEffect(() => {
@@ -264,7 +279,7 @@ function FlowCanvasInner() {
   const toolbarBtnDisabled = 'disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full relative">
+    <div ref={reactFlowWrapper} className="flex-1 h-full relative flow-canvas-wrapper">
       {/* SVG Arrow Markers for edges - Improved styling */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
@@ -361,38 +376,50 @@ function FlowCanvasInner() {
             onClick={() => setIsSearchOpen((v) => !v)}
             className={cn(toolbarBtnClass, isSearchOpen && 'ring-2 ring-primary')}
             title="Search (Ctrl+F)"
+            data-tour="search-btn"
           >
             <Search className="h-4 w-4" />
           </button>
+          <button
+            onClick={startTour}
+            className={toolbarBtnClass}
+            title="Show Tutorial"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
         {!isFlowLocked && (
           <>
-            <button
-              onClick={canvasUndo}
-              disabled={!canUndo}
-              className={cn(toolbarBtnClass, toolbarBtnDisabled)}
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={canvasRedo}
-              disabled={!canRedo}
-              className={cn(toolbarBtnClass, toolbarBtnDisabled)}
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={autoLayout}
-              className={toolbarBtnClass}
-              title="Clean up overlaps and align to grid"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Tidy Up
-            </button>
-            <SpacingDropdown onSelect={(spacing) => fullLayout(undefined, spacing)} />
+            <div className="flex gap-2" data-tour="undo-redo">
+              <button
+                onClick={canvasUndo}
+                disabled={!canUndo}
+                className={cn(toolbarBtnClass, toolbarBtnDisabled)}
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={canvasRedo}
+                disabled={!canRedo}
+                className={cn(toolbarBtnClass, toolbarBtnDisabled)}
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex gap-2" data-tour="auto-arrange-btn">
+              <button
+                onClick={autoLayout}
+                className={toolbarBtnClass}
+                title="Clean up overlaps and align to grid"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Tidy Up
+              </button>
+              <SpacingDropdown onSelect={(spacing) => fullLayout(undefined, spacing)} />
+            </div>
             {/* H/V direction toggle */}
-            <div className="flex rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+            <div className="flex rounded-lg border border-border bg-card shadow-sm overflow-hidden" data-tour="layout-toggle">
               <button
                 onClick={() => {
                   setLayoutDirection('LR');
@@ -434,18 +461,18 @@ function FlowCanvasInner() {
         )}
         </Panel>
 
-        {/* Floating "Add Question" button — bottom-left */}
+        {/* "Add Question" button — top-left */}
         {!isFlowLocked && (
-          <Panel position="bottom-left" className="!ml-14 !mb-2">
+          <Panel position="top-left" className="flex gap-2">
             <div className="relative">
               <AnimatePresence>
                 {isAddMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 mb-2 w-64 rounded-xl bg-card border border-border shadow-xl overflow-hidden"
+                    className="absolute top-full left-0 mt-2 w-64 rounded-xl bg-card border border-border shadow-xl overflow-hidden z-50"
                   >
                     <div className="px-3 pt-3 pb-1.5">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -485,14 +512,14 @@ function FlowCanvasInner() {
               <button
                 onClick={() => setIsAddMenuOpen((v) => !v)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg transition-all',
-                  'bg-primary text-primary-foreground hover:bg-primary/90',
-                  'border border-primary/20',
-                  isAddMenuOpen && 'ring-2 ring-ring ring-offset-2 ring-offset-background'
+                  toolbarBtnClass,
+                  isAddMenuOpen && 'ring-2 ring-primary'
                 )}
+                title="Add question or end screen"
+                data-tour="add-question-btn"
               >
-                {isAddMenuOpen ? <ChevronUp className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                <span className="text-sm font-medium">Add Question</span>
+                <Plus className="h-4 w-4" />
+                <span>Add Question</span>
               </button>
             </div>
           </Panel>

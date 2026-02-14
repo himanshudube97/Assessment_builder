@@ -24,6 +24,7 @@ export const StartNode = memo(function StartNode({
       title="Start"
       icon={<Play className="h-4 w-4" />}
       showTargetHandle={false}
+      dataTour="start-node"
     >
       <div className="space-y-2">
         <h3 className="font-semibold text-foreground">{data.title}</h3>

@@ -23,6 +23,7 @@ import type {
 import type { Answer as AnswerEntity } from '@/domain/entities/response';
 import { resolveAnswerPipes } from '@/lib/answerPiping';
 import { BackgroundDecorations } from '@/presentation/components/assessment/BackgroundDecorations';
+import { Dropdown } from '@/presentation/components/ui/Dropdown';
 
 interface AssessmentFlowProps {
   assessmentId: string;
@@ -775,19 +776,17 @@ function QuestionScreen({
 
         {/* Dropdown */}
         {data.questionType === 'dropdown' && data.options && (
-          <select
+          <Dropdown
+            options={data.options}
             value={(answer as string) || ''}
-            onChange={(e) => onAnswer(e.target.value)}
-            className="w-full px-4 py-3 focus:outline-none transition-colors"
-            style={inputStyle(!!answer)}
-          >
-            <option value="">Select an option...</option>
-            {data.options.map((option) => (
-              <option key={option.id} value={option.text}>
-                {option.text}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onAnswer(value)}
+            placeholder="Select an option..."
+            primaryColor={color}
+            textColor={textColor}
+            borderColor={cardBorder}
+            backgroundColor={cardBg}
+            borderRadius={borderRadius}
+          />
         )}
 
         {/* Date */}

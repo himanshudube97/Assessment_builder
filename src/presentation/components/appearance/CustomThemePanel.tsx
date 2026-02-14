@@ -2,6 +2,7 @@
 
 import type { AssessmentSettings, ButtonStyle, CardStyle } from '@/domain/entities/assessment';
 import { cn } from '@/lib/utils';
+import { Dropdown } from '@/presentation/components/ui/Dropdown';
 
 interface CustomThemePanelProps {
   settings: Partial<AssessmentSettings>;
@@ -9,9 +10,9 @@ interface CustomThemePanelProps {
 }
 
 const FONT_OPTIONS = [
-  { value: 'Geist Sans', label: 'Geist Sans' },
-  { value: 'Inter', label: 'Inter' },
-  { value: 'Merriweather', label: 'Merriweather' },
+  { id: 'geist-sans', text: 'Geist Sans' },
+  { id: 'inter', text: 'Inter' },
+  { id: 'merriweather', text: 'Merriweather' },
 ];
 
 const BUTTON_STYLES: { value: ButtonStyle; label: string }[] = [
@@ -83,17 +84,12 @@ export function CustomThemePanel({ settings, onChange }: CustomThemePanelProps) 
         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Font
         </h4>
-        <select
+        <Dropdown
+          options={FONT_OPTIONS}
           value={settings.fontFamily || 'Geist Sans'}
-          onChange={(e) => onChange({ fontFamily: e.target.value })}
-          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
-        >
-          {FONT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => onChange({ fontFamily: value })}
+          placeholder="Select a font..."
+        />
       </div>
 
       {/* Border Radius */}
