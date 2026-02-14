@@ -140,6 +140,9 @@ interface CanvasState {
   // Connection menu state
   connectionMenuSourceId: string | null;
 
+  // Search/filter state — null means no search active
+  searchHighlightIds: string[] | null;
+
   // Derived: true when status is not 'draft' (flow structure is locked)
   isFlowLocked: boolean;
 
@@ -194,6 +197,9 @@ interface CanvasState {
 
   // Spotlight mode
   clearNewlyAddedNode: () => void;
+
+  // Search/filter
+  setSearchHighlight: (ids: string[] | null) => void;
 
   // Connection menu
   openConnectionMenu: (nodeId: string) => void;
@@ -278,6 +284,7 @@ const initialState = {
   lastSavedAt: null,
   newlyAddedNodeId: null,
   connectionMenuSourceId: null,
+  searchHighlightIds: null,
   isFlowLocked: false,
 };
 
@@ -562,6 +569,10 @@ export const useCanvasStore = create<CanvasState>()(
 
           clearNewlyAddedNode: () => {
             set({ newlyAddedNodeId: null });
+          },
+
+          setSearchHighlight: (ids) => {
+            set({ searchHighlightIds: ids });
           },
 
           openConnectionMenu: (nodeId) => {

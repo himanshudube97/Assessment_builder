@@ -5,7 +5,7 @@
  * The main React Flow canvas for the visual editor
  */
 
-import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from 'zustand';
 import ReactFlow, {
   Background,
@@ -17,13 +17,14 @@ import ReactFlow, {
   type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2, Search } from 'lucide-react';
 
 import { useCanvasStore, canvasUndo, canvasRedo, OPTION_BASED_TYPES } from '@/presentation/stores/canvas.store';
 import { StartNode } from './StartNode';
 import { QuestionNode } from './QuestionNode';
 import { EndNode } from './EndNode';
 import { EdgeWithCondition } from './EdgeWithCondition';
+import { CanvasSearch } from './CanvasSearch';
 import type { QuestionType, EdgeCondition } from '@/domain/entities/flow';
 
 // Custom node types
@@ -49,6 +50,7 @@ interface FlowCanvasProps {
 function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project } = useReactFlow();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -65,6 +67,18 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   // Reactive undo/redo state
   const canUndo = useStore(useCanvasStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useCanvasStore.temporal, (s) => s.futureStates.length > 0);
+
+  // Ctrl+F to toggle search
+  useEffect(() => {
+    const handleSearchKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleSearchKey);
+    return () => window.removeEventListener('keydown', handleSearchKey);
+  }, []);
 
   // Auto-dismiss node highlight after a short delay
   useEffect(() => {
@@ -273,8 +287,24 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
           className="!bg-card !border-border !shadow-md"
           showInteractive={false}
         />
+        {/* Search panel */}
+        <Panel position="top-center">
+          <CanvasSearch
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+          />
+        </Panel>
+
+        <Panel position="top-right" className="flex gap-2">
+          <button
+            onClick={() => setIsSearchOpen((v) => !v)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-card border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm ${isSearchOpen ? 'ring-2 ring-primary' : ''}`}
+            title="Search (Ctrl+F)"
+          >
+            <Search className="h-4 w-4" />
+          </button>
         {!isFlowLocked && (
-          <Panel position="top-right" className="flex gap-2">
+          <>
             <button
               onClick={canvasUndo}
               disabled={!canUndo}
@@ -299,8 +329,9 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
               <LayoutGrid className="h-4 w-4" />
               Tidy Up
             </button>
-          </Panel>
+          </>
         )}
+        </Panel>
       </ReactFlow>
 
     </div>

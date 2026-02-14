@@ -8,77 +8,31 @@
 import { memo } from 'react';
 import { type NodeProps } from 'reactflow';
 import {
-  CircleDot,
-  CheckSquare,
-  Type,
-  AlignLeft,
   Star,
-  ToggleLeft,
   HelpCircle,
   Hash,
   Mail,
   ChevronDown,
   Calendar,
-  Gauge,
 } from 'lucide-react';
 import { BaseNode } from './BaseNode';
-import type { QuestionNodeData, QuestionType } from '@/domain/entities/flow';
+import type { QuestionNodeData } from '@/domain/entities/flow';
 import { cn } from '@/lib/utils';
 import { getDisplayText } from '@/lib/answerPiping';
-
-const questionTypeIcons: Record<QuestionType, React.ReactNode> = {
-  multiple_choice_single: <CircleDot className="h-4 w-4" />,
-  multiple_choice_multi: <CheckSquare className="h-4 w-4" />,
-  short_text: <Type className="h-4 w-4" />,
-  long_text: <AlignLeft className="h-4 w-4" />,
-  rating: <Star className="h-4 w-4" />,
-  yes_no: <ToggleLeft className="h-4 w-4" />,
-  number: <Hash className="h-4 w-4" />,
-  email: <Mail className="h-4 w-4" />,
-  dropdown: <ChevronDown className="h-4 w-4" />,
-  date: <Calendar className="h-4 w-4" />,
-  nps: <Gauge className="h-4 w-4" />,
-};
-
-const questionTypeLabels: Record<QuestionType, string> = {
-  multiple_choice_single: 'Multiple Choice',
-  multiple_choice_multi: 'Checkboxes',
-  short_text: 'Short Text',
-  long_text: 'Long Text',
-  rating: 'Rating',
-  yes_no: 'Yes / No',
-  number: 'Number',
-  email: 'Email',
-  dropdown: 'Dropdown',
-  date: 'Date',
-  nps: 'NPS Score',
-};
-
-// Different colors for each question type
-const questionTypeColors: Record<QuestionType, { header: string; border: string }> = {
-  multiple_choice_single: { header: 'bg-blue-500', border: 'border-blue-300 dark:border-blue-700' },
-  multiple_choice_multi: { header: 'bg-indigo-500', border: 'border-indigo-300 dark:border-indigo-700' },
-  short_text: { header: 'bg-cyan-500', border: 'border-cyan-300 dark:border-cyan-700' },
-  long_text: { header: 'bg-teal-500', border: 'border-teal-300 dark:border-teal-700' },
-  rating: { header: 'bg-amber-500', border: 'border-amber-300 dark:border-amber-700' },
-  yes_no: { header: 'bg-pink-500', border: 'border-pink-300 dark:border-pink-700' },
-  number: { header: 'bg-emerald-500', border: 'border-emerald-300 dark:border-emerald-700' },
-  email: { header: 'bg-rose-500', border: 'border-rose-300 dark:border-rose-700' },
-  dropdown: { header: 'bg-purple-500', border: 'border-purple-300 dark:border-purple-700' },
-  date: { header: 'bg-sky-500', border: 'border-sky-300 dark:border-sky-700' },
-  nps: { header: 'bg-lime-500', border: 'border-lime-300 dark:border-lime-700' },
-};
+import { QUESTION_TYPE_META } from '@/domain/constants/questionTypes';
 
 export const QuestionNode = memo(function QuestionNode({
   id,
   data,
   selected,
 }: NodeProps<QuestionNodeData>) {
-  const icon = questionTypeIcons[data.questionType] || (
-    <HelpCircle className="h-4 w-4" />
-  );
-  const typeLabel = questionTypeLabels[data.questionType] || 'Question';
-  const colors = questionTypeColors[data.questionType] || { header: 'bg-indigo-500', border: 'border-indigo-300 dark:border-indigo-700' };
+  const meta = QUESTION_TYPE_META[data.questionType];
+  const Icon = meta?.icon;
+  const icon = Icon ? <Icon className="h-4 w-4" /> : <HelpCircle className="h-4 w-4" />;
+  const typeLabel = meta?.label || 'Question';
+  const colors = meta
+    ? { header: meta.headerColor, border: meta.borderColor }
+    : { header: 'bg-indigo-500', border: 'border-indigo-300 dark:border-indigo-700' };
 
   return (
     <BaseNode

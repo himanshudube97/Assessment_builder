@@ -13,17 +13,6 @@ import {
   Plus,
   Flag,
   HelpCircle,
-  CircleDot,
-  CheckSquare,
-  Type,
-  AlignLeft,
-  Star,
-  ToggleLeft,
-  Hash,
-  Mail,
-  ChevronDown,
-  Calendar,
-  Gauge,
   ChevronRight,
   ArrowLeft,
   AlertCircle,
@@ -33,25 +22,12 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCanvasStore } from '@/presentation/stores/canvas.store';
 import type { QuestionNodeData, QuestionType, EdgeCondition } from '@/domain/entities/flow';
+import { QUESTION_TYPES_LIST } from '@/domain/constants/questionTypes';
 
 interface ConnectionMenuProps {
   sourceNodeId: string;
   onClose: () => void;
 }
-
-const questionTypes: { type: QuestionType; label: string; icon: React.ReactNode }[] = [
-  { type: 'multiple_choice_single', label: 'Multiple Choice', icon: <CircleDot className="h-3.5 w-3.5" /> },
-  { type: 'multiple_choice_multi', label: 'Checkboxes', icon: <CheckSquare className="h-3.5 w-3.5" /> },
-  { type: 'yes_no', label: 'Yes / No', icon: <ToggleLeft className="h-3.5 w-3.5" /> },
-  { type: 'short_text', label: 'Short Text', icon: <Type className="h-3.5 w-3.5" /> },
-  { type: 'long_text', label: 'Long Text', icon: <AlignLeft className="h-3.5 w-3.5" /> },
-  { type: 'rating', label: 'Rating', icon: <Star className="h-3.5 w-3.5" /> },
-  { type: 'number', label: 'Number', icon: <Hash className="h-3.5 w-3.5" /> },
-  { type: 'email', label: 'Email', icon: <Mail className="h-3.5 w-3.5" /> },
-  { type: 'dropdown', label: 'Dropdown', icon: <ChevronDown className="h-3.5 w-3.5" /> },
-  { type: 'date', label: 'Date', icon: <Calendar className="h-3.5 w-3.5" /> },
-  { type: 'nps', label: 'NPS Score', icon: <Gauge className="h-3.5 w-3.5" /> },
-];
 
 export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -383,19 +359,22 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
               </span>
             </div>
             <div className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
-              {questionTypes.map((qt) => (
-                <button
-                  key={qt.type}
-                  onClick={() => handleCreateNew('question', qt.type)}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
-                    'hover:bg-muted transition-colors',
-                  )}
-                >
-                  <span className="text-indigo-500 flex-shrink-0">{qt.icon}</span>
-                  <span className="text-foreground">{qt.label}</span>
-                </button>
-              ))}
+              {QUESTION_TYPES_LIST.map(([type, meta]) => {
+                const Icon = meta.icon;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleCreateNew('question', type)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
+                      'hover:bg-muted transition-colors',
+                    )}
+                  >
+                    <span className={cn('flex-shrink-0', meta.color)}><Icon className="h-3.5 w-3.5" /></span>
+                    <span className="text-foreground">{meta.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
         ) : (

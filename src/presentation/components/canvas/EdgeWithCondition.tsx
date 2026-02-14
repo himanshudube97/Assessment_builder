@@ -43,12 +43,20 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   selected,
   data,
   source,
+  target,
   id,
 }: EdgeProps<EdgeData>) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { getNode } = useReactFlow();
+  const searchHighlightIds = useCanvasStore((s) => s.searchHighlightIds);
+
+  // Compute edge dimming based on search: both ends dimmed = fully dim, one end = partial
+  const searchActive = searchHighlightIds !== null;
+  const sourceInSearch = searchActive && searchHighlightIds.includes(source);
+  const targetInSearch = searchActive && searchHighlightIds.includes(target);
+  const edgeSearchOpacity = !searchActive ? 1 : (sourceInSearch || targetInSearch) ? 0.4 : 0.1;
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -83,6 +91,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
 
   return (
     <>
+      <g style={{ opacity: edgeSearchOpacity, transition: 'opacity 0.2s ease' }}>
       {/* Glow effect for selected/hovered edges */}
       {(selected || isHovered) && (
         <path
@@ -127,13 +136,16 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
         onMouseLeave={() => setIsHovered(false)}
         style={{ cursor: 'pointer' }}
       />
+      </g>
 
       <EdgeLabelRenderer>
         <div
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: 'all',
+            pointerEvents: edgeSearchOpacity < 0.2 ? 'none' : 'all',
+            opacity: edgeSearchOpacity,
+            transition: 'opacity 0.2s ease',
           }}
           className="nodrag nopan"
           onMouseEnter={() => setIsHovered(true)}

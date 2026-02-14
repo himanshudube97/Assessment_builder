@@ -64,8 +64,11 @@ export const BaseNode = memo(function BaseNode({
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const searchHighlightIds = useCanvasStore((s) => s.searchHighlightIds);
+
   const isNewlyAdded = id === newlyAddedNodeId;
   const showConnectionMenu = connectionMenuSourceId === id;
+  const isDimmedBySearch = searchHighlightIds !== null && !searchHighlightIds.includes(id);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,10 +88,13 @@ export const BaseNode = memo(function BaseNode({
       className={cn(
         'group relative w-[280px] rounded-xl border-2 bg-card shadow-md transition-all duration-200 overflow-visible',
         'hover:shadow-xl cursor-grab active:cursor-grabbing',
+        'transition-opacity duration-200',
         borderColor || nodeBorderColors[type],
         selected && 'ring-2 ring-ring ring-offset-2 ring-offset-background shadow-xl',
         // Glow effect for newly added node
-        isNewlyAdded && 'ring-4 ring-primary/50 shadow-[0_0_30px_rgba(99,102,241,0.4)]'
+        isNewlyAdded && 'ring-4 ring-primary/50 shadow-[0_0_30px_rgba(99,102,241,0.4)]',
+        // Dim when search is active and this node doesn't match
+        isDimmedBySearch && 'opacity-[0.15] pointer-events-none'
       )}
       onClick={handleClick}
     >
