@@ -7,10 +7,11 @@
 
 import { memo, type ReactNode } from 'react';
 import { Handle, Position } from 'reactflow';
-import { motion } from 'framer-motion';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GripVertical, Trash2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCanvasStore } from '@/presentation/stores/canvas.store';
+import { useCanvasStore, useIsNodeAtOptionLimit } from '@/presentation/stores/canvas.store';
+import { ConnectionMenu } from './ConnectionMenu';
 
 interface BaseNodeProps {
   id: string;
@@ -54,8 +55,14 @@ export const BaseNode = memo(function BaseNode({
   const selectNode = useCanvasStore((s) => s.selectNode);
   const deleteNode = useCanvasStore((s) => s.deleteNode);
   const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
+  const connectionMenuSourceId = useCanvasStore((s) => s.connectionMenuSourceId);
+  const openConnectionMenu = useCanvasStore((s) => s.openConnectionMenu);
+  const closeConnectionMenu = useCanvasStore((s) => s.closeConnectionMenu);
+  const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
+  const atOptionLimit = useIsNodeAtOptionLimit(id);
 
   const isNewlyAdded = id === newlyAddedNodeId;
+  const showConnectionMenu = connectionMenuSourceId === id;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -73,7 +80,7 @@ export const BaseNode = memo(function BaseNode({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
       className={cn(
-        'relative w-[280px] rounded-xl border-2 bg-card shadow-md transition-all duration-200 overflow-visible',
+        'group relative w-[280px] rounded-xl border-2 bg-card shadow-md transition-all duration-200 overflow-visible',
         'hover:shadow-xl cursor-grab active:cursor-grabbing',
         borderColor || nodeBorderColors[type],
         selected && 'ring-2 ring-ring ring-offset-2 ring-offset-background shadow-xl',
@@ -129,18 +136,53 @@ export const BaseNode = memo(function BaseNode({
         />
       )}
 
-      {/* Source Handle - Improved */}
+      {/* Source Handle + Add Connection Button */}
       {showSourceHandle && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className={cn(
-            '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-right-2',
-            '!transition-all !duration-200',
-            'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
-            selected && '!bg-primary'
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            className={cn(
+              '!w-4 !h-4 !bg-slate-400 !border-[3px] !border-background !-right-2',
+              '!transition-all !duration-200',
+              'hover:!bg-primary hover:!scale-125 hover:!border-primary/30',
+              selected && '!bg-primary'
+            )}
+          />
+          {/* "+" button — visible on hover/select, hidden when locked or at option limit */}
+          {!isFlowLocked && !atOptionLimit && (
+            <button
+              className={cn(
+                'nodrag absolute -right-4 top-1/2 translate-x-full -translate-y-1/2',
+                'w-7 h-7 rounded-full flex items-center justify-center',
+                'bg-primary text-primary-foreground shadow-md',
+                'border-2 border-background',
+                'transition-all duration-200 ease-out',
+                (selected || showConnectionMenu)
+                  ? 'opacity-100 scale-100'
+                  : 'opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100',
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (showConnectionMenu) {
+                  closeConnectionMenu();
+                } else {
+                  openConnectionMenu(id);
+                }
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
           )}
-        />
+          {/* Connection Menu */}
+          <AnimatePresence>
+            {showConnectionMenu && (
+              <div className="nodrag nopan absolute -right-4 top-1/2 translate-x-full mt-5 z-50">
+                <ConnectionMenu sourceNodeId={id} onClose={closeConnectionMenu} />
+              </div>
+            )}
+          </AnimatePresence>
+        </>
       )}
     </motion.div>
   );

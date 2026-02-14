@@ -281,7 +281,7 @@ describe('PreviewModal', () => {
       expect(screen.getByText('Thank You!')).toBeInTheDocument();
     });
 
-    it('follows per-option branching', async () => {
+    it('follows conditional branching', async () => {
       const user = userEvent.setup();
 
       const branchNodes: FlowNode[] = [
@@ -292,8 +292,8 @@ describe('PreviewModal', () => {
       ];
       const branchEdges: FlowEdge[] = [
         { id: 'e1', source: 'start', target: 'q-2', sourceHandle: null, condition: null },
-        { id: 'e2', source: 'q-2', target: 'end-red', sourceHandle: 'opt-r', condition: null },
-        { id: 'e3', source: 'q-2', target: 'end-blue', sourceHandle: 'opt-b', condition: null },
+        { id: 'e2', source: 'q-2', target: 'end-red', sourceHandle: null, condition: { type: 'equals', value: 'Red' } },
+        { id: 'e3', source: 'q-2', target: 'end-blue', sourceHandle: null, condition: { type: 'equals', value: 'Blue' } },
       ];
 
       render(

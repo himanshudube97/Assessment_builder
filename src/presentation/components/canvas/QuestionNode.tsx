@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react';
-import { Handle, Position, type NodeProps } from 'reactflow';
+import { type NodeProps } from 'reactflow';
 import {
   CircleDot,
   CheckSquare,
@@ -80,13 +80,6 @@ export const QuestionNode = memo(function QuestionNode({
   const typeLabel = questionTypeLabels[data.questionType] || 'Question';
   const colors = questionTypeColors[data.questionType] || { header: 'bg-indigo-500', border: 'border-indigo-300 dark:border-indigo-700' };
 
-  // Yes/No always has per-option branching (2 dots: Yes and No)
-  // Multiple choice single has optional branching via toggle
-  const hasOptionBranching =
-    data.questionType === 'yes_no' ||
-    (data.questionType === 'multiple_choice_single' && data.enableBranching === true);
-
-
   return (
     <BaseNode
       id={id}
@@ -94,11 +87,10 @@ export const QuestionNode = memo(function QuestionNode({
       type="question"
       title={typeLabel}
       icon={icon}
-      showSourceHandle={!hasOptionBranching}
       headerColor={colors.header}
       borderColor={colors.border}
     >
-      <div className={cn('space-y-3', hasOptionBranching && 'overflow-visible')}>
+      <div className="space-y-3">
         {/* Question text */}
         <p
           className={cn(
@@ -114,7 +106,7 @@ export const QuestionNode = memo(function QuestionNode({
           data.questionType === 'multiple_choice_multi' ||
           data.questionType === 'yes_no') &&
           data.options && (
-            <div className={cn('space-y-1.5', hasOptionBranching && 'overflow-visible')}>
+            <div className="space-y-1.5">
               {data.options.slice(0, 4).map((option) => (
                 <div
                   key={option.id}
@@ -130,20 +122,6 @@ export const QuestionNode = memo(function QuestionNode({
 
                   {/* Option text */}
                   <span className="truncate flex-1 text-muted-foreground">{option.text}</span>
-
-                  {/* Per-option handle - positioned at right edge of node */}
-                  {hasOptionBranching && (
-                    <Handle
-                      type="source"
-                      position={Position.Right}
-                      id={option.id}
-                      className={cn(
-                        '!w-3 !h-3 !bg-indigo-400 !border-2 !border-background !shadow-sm !rounded-full',
-                        'hover:!w-4 hover:!h-4 !transition-all !duration-200'
-                      )}
-                      style={{ right: '-22px', top: '50%' }}
-                    />
-                  )}
                 </div>
               ))}
               {data.options.length > 4 && (

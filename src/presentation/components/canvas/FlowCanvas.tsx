@@ -13,15 +13,13 @@ import ReactFlow, {
   Panel,
   ReactFlowProvider,
   useReactFlow,
-  useUpdateNodeInternals,
-  reconnectEdge,
   type Edge,
   type Connection,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { LayoutGrid, Undo2, Redo2 } from 'lucide-react';
 
-import { useCanvasStore, canvasUndo, canvasRedo } from '@/presentation/stores/canvas.store';
+import { useCanvasStore, canvasUndo, canvasRedo, OPTION_BASED_TYPES } from '@/presentation/stores/canvas.store';
 import { StartNode } from './StartNode';
 import { QuestionNode } from './QuestionNode';
 import { EndNode } from './EndNode';
@@ -51,7 +49,6 @@ interface FlowCanvasProps {
 function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project } = useReactFlow();
-  const updateNodeInternals = useUpdateNodeInternals();
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -63,24 +60,11 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
   const autoLayout = useCanvasStore((s) => s.autoLayout);
   const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
-  const nodeToUpdateInternals = useCanvasStore((s) => s.nodeToUpdateInternals);
-  const clearNodeToUpdateInternals = useCanvasStore((s) => s.clearNodeToUpdateInternals);
   const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
 
   // Reactive undo/redo state
   const canUndo = useStore(useCanvasStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useCanvasStore.temporal, (s) => s.futureStates.length > 0);
-
-  // When handles change (branching toggled), tell React Flow to recalculate handle positions
-  useEffect(() => {
-    if (nodeToUpdateInternals) {
-      // Small delay to let React commit the new handles to the DOM first
-      requestAnimationFrame(() => {
-        updateNodeInternals(nodeToUpdateInternals);
-        clearNodeToUpdateInternals();
-      });
-    }
-  }, [nodeToUpdateInternals, updateNodeInternals, clearNodeToUpdateInternals]);
 
   // Auto-dismiss node highlight after a short delay
   useEffect(() => {
@@ -92,19 +76,41 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
     }
   }, [newlyAddedNodeId, clearNewlyAddedNode]);
 
-  // Add condition change handler to edges
+  const onEdgesChangeStore = useCanvasStore((s) => s.onEdgesChange);
+
+  // Add condition change handler + context to edges
   const edgesWithHandlers = useMemo(() => {
-    return edges.map((edge) => ({
-      ...edge,
-      type: 'conditionEdge',
-      data: {
-        ...edge.data,
-        onConditionChange: (condition: EdgeCondition | null) => {
-          updateEdgeCondition(edge.id, condition);
+    return edges.map((edge) => {
+      // Find source node type and question type
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const sourceNodeType = sourceNode?.type as string | undefined;
+      const sourceQuestionType = (sourceNode?.data as { questionType?: string } | undefined)?.questionType;
+      const isOptionBasedSource = !!(sourceQuestionType && OPTION_BASED_TYPES.has(sourceQuestionType));
+
+      // Count sibling edges (other edges from same source)
+      const siblingEdges = edges.filter((e) => e.source === edge.source);
+      const hasSiblingConditions = siblingEdges.some(
+        (e) => e.id !== edge.id && e.data?.condition != null
+      );
+
+      return {
+        ...edge,
+        type: 'conditionEdge',
+        data: {
+          ...edge.data,
+          sourceNodeType,
+          hasSiblingConditions,
+          isOptionBased: isOptionBasedSource,
+          onConditionChange: (condition: EdgeCondition | null) => {
+            updateEdgeCondition(edge.id, condition);
+          },
+          onDelete: () => {
+            onEdgesChangeStore([{ id: edge.id, type: 'remove' as const }]);
+          },
         },
-      },
-    }));
-  }, [edges, updateEdgeCondition]);
+      };
+    });
+  }, [edges, nodes, updateEdgeCondition, onEdgesChangeStore]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();

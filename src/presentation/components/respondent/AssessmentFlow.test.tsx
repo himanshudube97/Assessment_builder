@@ -340,7 +340,7 @@ describe('Conditional navigation', () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 
-  it('follows per-option branching for yes_no', () => {
+  it('follows conditional branching for yes_no', () => {
     const ynNode: FlowNode = {
       id: 'q-yn',
       type: 'question',
@@ -354,7 +354,6 @@ describe('Conditional navigation', () => {
           { id: 'opt-yes', text: 'Yes' },
           { id: 'opt-no', text: 'No' },
         ],
-        enableBranching: true,
       } satisfies QuestionNodeData,
     };
     const endYes: FlowNode = {
@@ -371,8 +370,8 @@ describe('Conditional navigation', () => {
     };
     const branchEdges: FlowEdge[] = [
       { id: 'e-1', source: 'start-1', target: 'q-yn', sourceHandle: null, condition: null },
-      { id: 'e-yes', source: 'q-yn', target: 'end-yes', sourceHandle: 'opt-yes', condition: null },
-      { id: 'e-no', source: 'q-yn', target: 'end-no', sourceHandle: 'opt-no', condition: null },
+      { id: 'e-yes', source: 'q-yn', target: 'end-yes', sourceHandle: null, condition: { type: 'equals', value: 'Yes' } },
+      { id: 'e-no', source: 'q-yn', target: 'end-no', sourceHandle: null, condition: { type: 'equals', value: 'No' } },
     ];
 
     render(

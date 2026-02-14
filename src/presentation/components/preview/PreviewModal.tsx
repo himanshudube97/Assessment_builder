@@ -86,7 +86,7 @@ export function PreviewModal({
       ? Math.round((answeredCount / questionNodes.length) * 100)
       : 0;
 
-  // Find next node based on conditions and per-option branching
+  // Find next node based on edge conditions
   const findNextNode = useCallback(
     (fromNodeId: string, answer?: Answer): FlowNode | null => {
       const outgoingEdges = edges.filter((e) => e.source === fromNodeId);
@@ -98,43 +98,17 @@ export function PreviewModal({
         return nodes.find((n) => n.id === outgoingEdges[0].target) || null;
       }
 
-      // Check conditional edges first
-      for (const edge of outgoingEdges) {
-        if (edge.condition && answer !== undefined) {
-          if (evaluateCondition(edge.condition, answer)) {
+      // Check conditional edges — first match wins
+      if (answer !== undefined) {
+        for (const edge of outgoingEdges) {
+          if (edge.condition && evaluateCondition(edge.condition, answer)) {
             return nodes.find((n) => n.id === edge.target) || null;
           }
         }
       }
 
-      // Per-option branching: match answer to sourceHandle
-      if (answer !== undefined) {
-        const handleEdges = outgoingEdges.filter((e) => e.sourceHandle);
-        if (handleEdges.length > 0) {
-          const sourceNode = nodes.find((n) => n.id === fromNodeId);
-          if (sourceNode?.type === 'question') {
-            const data = sourceNode.data as QuestionNodeData;
-            if (data.options) {
-              const matchedOption = data.options.find(
-                (opt) => opt.text === String(answer)
-              );
-              if (matchedOption) {
-                const matchedEdge = handleEdges.find(
-                  (e) => e.sourceHandle === matchedOption.id
-                );
-                if (matchedEdge) {
-                  return nodes.find((n) => n.id === matchedEdge.target) || null;
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Fall back to edge without condition (default path)
-      const defaultEdge = outgoingEdges.find(
-        (e) => !e.condition && !e.sourceHandle
-      );
+      // Fall back to default edge (no condition)
+      const defaultEdge = outgoingEdges.find((e) => !e.condition);
       if (defaultEdge) {
         return nodes.find((n) => n.id === defaultEdge.target) || null;
       }

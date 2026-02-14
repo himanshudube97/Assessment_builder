@@ -139,12 +139,12 @@ describe('createQuestionNode', () => {
     expect(data.maxLength).toBe(1000);
   });
 
-  it('sets yes/no options with enableBranching for yes_no type', () => {
+  it('sets yes/no options for yes_no type', () => {
     const node = createQuestionNode({ x: 0, y: 0 }, 'yes_no');
     const data = node.data as QuestionNodeData;
     expect(data.options).toBeDefined();
     expect(data.options!.map((o) => o.text)).toEqual(['Yes', 'No']);
-    expect(data.enableBranching).toBe(true);
+    expect(data.enableBranching).toBeUndefined();
   });
 
   it('sets number placeholder for number type', () => {

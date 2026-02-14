@@ -114,16 +114,29 @@ describe('loadCanvas', () => {
     expect(store().edgeConditionMap['e-cond']).toEqual({ type: 'equals', value: 'Option A' });
   });
 
-  it('reconciles branching: migrates null sourceHandle for yes_no nodes with branching', () => {
-    // q-yn has branching enabled but edge e-3 already has sourceHandle, so this tests
-    // the case where an edge has null sourceHandle for a branching node
-    const edgesNullHandle: FlowEdge[] = [
-      { id: 'e-1', source: 'start-1', target: 'q-yn', sourceHandle: null, condition: null },
-      { id: 'e-yn', source: 'q-yn', target: 'end-1', sourceHandle: null, condition: null },
-    ];
-    store().loadCanvas(testNodes, edgesNullHandle);
+  it('migrates per-option edges to conditional edges on load', () => {
+    // e-3 has sourceHandle: 'opt-yes' (old per-option branching)
+    // After loading, it should be converted to a conditional edge with equals "Yes"
+    store().loadCanvas(testNodes, testEdges);
     const ynEdge = store().edges.find((e) => e.source === 'q-yn');
-    expect(ynEdge?.sourceHandle).toBe('opt-yes'); // migrated to first option
+    expect(ynEdge?.sourceHandle).toBeNull(); // sourceHandle cleared
+    expect(store().edgeConditionMap[ynEdge!.id]).toEqual({
+      type: 'equals',
+      value: 'Yes',
+      optionId: 'opt-yes',
+    });
+  });
+
+  it('deduplicates per-option edges to same target during migration', () => {
+    const edgesWithDups: FlowEdge[] = [
+      { id: 'e-1', source: 'start-1', target: 'q-yn', sourceHandle: null, condition: null },
+      { id: 'e-yes', source: 'q-yn', target: 'end-1', sourceHandle: 'opt-yes', condition: null },
+      { id: 'e-no', source: 'q-yn', target: 'end-1', sourceHandle: 'opt-no', condition: null },
+    ];
+    store().loadCanvas(testNodes, edgesWithDups);
+    const ynEdges = store().edges.filter((e) => e.source === 'q-yn');
+    expect(ynEdges).toHaveLength(1);
+    expect(ynEdges[0].sourceHandle).toBeNull();
   });
 
   it('sets isDirty to false after loading', () => {
@@ -295,106 +308,6 @@ describe('onConnect', () => {
   });
 });
 
-// ===== toggleBranching =====
-
-describe('toggleBranching', () => {
-  it('enables branching: sets enableBranching=true on node data', () => {
-    store().loadCanvas(testNodes, testEdges);
-    store().toggleBranching('q-mcq', true);
-    const node = store().nodes.find((n) => n.id === 'q-mcq');
-    expect((node?.data as QuestionNodeData).enableBranching).toBe(true);
-  });
-
-  it('enables branching: migrates edges from null sourceHandle to first option ID', () => {
-    store().loadCanvas(testNodes, testEdges);
-    store().toggleBranching('q-mcq', true);
-    const mcqEdges = store().edges.filter((e) => e.source === 'q-mcq');
-    // All outgoing edges should now have sourceHandle = first option
-    mcqEdges.forEach((e) => {
-      expect(e.sourceHandle).toBe('opt-1');
-    });
-  });
-
-  it('disables branching: sets enableBranching=false on node data', () => {
-    store().loadCanvas(testNodes, testEdges);
-    // q-yn already has branching enabled
-    store().toggleBranching('q-yn', false);
-    const node = store().nodes.find((n) => n.id === 'q-yn');
-    expect((node?.data as QuestionNodeData).enableBranching).toBe(false);
-  });
-
-  it('disables branching: migrates per-option edges to null sourceHandle', () => {
-    store().loadCanvas(testNodes, testEdges);
-    store().toggleBranching('q-yn', false);
-    const ynEdges = store().edges.filter((e) => e.source === 'q-yn');
-    ynEdges.forEach((e) => {
-      expect(e.sourceHandle).toBeNull();
-    });
-  });
-
-  it('disables branching: deduplicates edges to same target', () => {
-    // Set up two edges from q-yn to end-1 via different handles
-    const edgesWithDups: FlowEdge[] = [
-      { id: 'e-1', source: 'start-1', target: 'q-yn', sourceHandle: null, condition: null },
-      { id: 'e-yes', source: 'q-yn', target: 'end-1', sourceHandle: 'opt-yes', condition: null },
-      { id: 'e-no', source: 'q-yn', target: 'end-1', sourceHandle: 'opt-no', condition: null },
-    ];
-    store().loadCanvas(testNodes, edgesWithDups);
-    store().toggleBranching('q-yn', false);
-    const ynEdges = store().edges.filter((e) => e.source === 'q-yn');
-    expect(ynEdges).toHaveLength(1); // deduplicated
-    expect(ynEdges[0].target).toBe('end-1');
-  });
-
-  it('sets nodeToUpdateInternals for React Flow handle recalculation', () => {
-    store().loadCanvas(testNodes, testEdges);
-    store().toggleBranching('q-mcq', true);
-    expect(store().nodeToUpdateInternals).toBe('q-mcq');
-  });
-
-  it('does nothing when isFlowLocked is true', () => {
-    store().setAssessment('a-1', 'T', null, 'published');
-    store().loadCanvas(testNodes, testEdges);
-    const prevData = store().nodes.find((n) => n.id === 'q-mcq')?.data;
-    store().toggleBranching('q-mcq', true);
-    const afterData = store().nodes.find((n) => n.id === 'q-mcq')?.data;
-    expect(afterData).toEqual(prevData);
-  });
-});
-
-// ===== canDisableBranching =====
-
-describe('canDisableBranching', () => {
-  it('returns true when 0 unique targets from per-option edges', () => {
-    store().loadCanvas(testNodes, [
-      { id: 'e-1', source: 'start-1', target: 'q-mcq', sourceHandle: null, condition: null },
-    ]);
-    expect(store().canDisableBranching('q-mcq')).toBe(true);
-  });
-
-  it('returns true when 1 unique target from per-option edges', () => {
-    store().loadCanvas(testNodes, testEdges);
-    // q-yn has one edge to end-1 via opt-yes handle
-    expect(store().canDisableBranching('q-yn')).toBe(true);
-  });
-
-  it('returns false when 2+ unique targets (would lose routing)', () => {
-    const endNode2: FlowNode = {
-      id: 'end-2',
-      type: 'end',
-      position: { x: 500, y: 650 },
-      data: { title: 'Alt End', description: 'Alt', showScore: false, redirectUrl: null },
-    };
-    const edgesBranched: FlowEdge[] = [
-      { id: 'e-1', source: 'start-1', target: 'q-yn', sourceHandle: null, condition: null },
-      { id: 'e-yes', source: 'q-yn', target: 'end-1', sourceHandle: 'opt-yes', condition: null },
-      { id: 'e-no', source: 'q-yn', target: 'end-2', sourceHandle: 'opt-no', condition: null },
-    ];
-    store().loadCanvas([...testNodes, endNode2], edgesBranched);
-    expect(store().canDisableBranching('q-yn')).toBe(false);
-  });
-});
-
 // ===== updateEdgeCondition =====
 
 describe('updateEdgeCondition', () => {
@@ -514,7 +427,6 @@ describe('flow lock behavior', () => {
     store().addQuestionNode('rating', { x: 0, y: 0 });
     store().deleteNode('q-mcq');
     store().updateNodeData('q-mcq', { questionText: 'changed' });
-    store().toggleBranching('q-mcq', true);
     store().autoLayout();
 
     expect(store().nodes.length).toBe(snapshot.nodes.length);

@@ -6,7 +6,7 @@
  * Features: Animated flow direction, improved visuals, condition editing
  */
 
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -15,13 +15,17 @@ import {
   type EdgeProps,
 } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap } from 'lucide-react';
+import { X, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EdgeCondition, ConditionType, MatchMode } from '@/domain/entities/flow';
 
 interface EdgeData {
   condition?: EdgeCondition | null;
   onConditionChange?: (condition: EdgeCondition | null) => void;
+  onDelete?: () => void;
+  sourceNodeType?: string;
+  hasSiblingConditions?: boolean;
+  isOptionBased?: boolean;
 }
 
 export const EdgeWithCondition = memo(function EdgeWithCondition({
@@ -54,6 +58,9 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   // Get source node to determine available conditions
   const sourceNode = getNode(source);
   const hasCondition = data?.condition != null;
+  const isFromStart = data?.sourceNodeType === 'start';
+  const hasSiblingConditions = data?.hasSiblingConditions ?? false;
+  const isOptionBased = data?.isOptionBased ?? false;
 
   // Edge colors with better visual hierarchy
   const strokeColor = hasCondition
@@ -65,6 +72,9 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const glowColor = hasCondition
     ? 'rgba(139, 92, 246, 0.3)'
     : 'rgba(99, 102, 241, 0.3)';
+
+  // Label for unconditioned edges: "Else" when siblings have conditions, otherwise nothing for start edges
+  const defaultLabel = hasSiblingConditions ? 'Else' : 'Default';
 
   return (
     <>
@@ -124,33 +134,134 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <AnimatePresence mode="wait">
-            {hasCondition && (
+          {/* Start node edges: no badge at all, just optional delete on hover */}
+          {isFromStart ? (
+            <AnimatePresence>
+              {(isHovered || selected) && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center gap-1"
+                >
+                  {data?.onDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        data.onDelete?.();
+                      }}
+                      className={cn(
+                        'p-1.5 rounded-full transition-all',
+                        'bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400',
+                        'hover:bg-red-200 dark:hover:bg-red-800/50 hover:scale-110'
+                      )}
+                      title="Delete connection"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          ) : hasCondition ? (
+            /* Condition badge — non-clickable for option-based (auto-assigned) */
+            <div className="flex items-center gap-1">
               <motion.div
                 key="condition"
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
                   'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300',
                   'border-2 border-violet-200 dark:border-violet-700',
-                  'cursor-pointer hover:bg-violet-200 dark:hover:bg-violet-800',
-                  'shadow-sm hover:shadow-md transition-all'
+                  'shadow-sm transition-all',
+                  !isOptionBased && 'cursor-pointer hover:bg-violet-200 dark:hover:bg-violet-800 hover:shadow-md',
                 )}
-                onClick={() => setIsEditing(true)}
+                onClick={!isOptionBased ? () => setIsEditing(true) : undefined}
               >
                 <Zap className="h-3.5 w-3.5" />
                 <span className="max-w-[120px] truncate">
                   {formatCondition(data.condition!)}
                 </span>
               </motion.div>
-            )}
-          </AnimatePresence>
+              {/* Delete button on hover */}
+              <AnimatePresence>
+                {(isHovered || selected) && data?.onDelete && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.5, width: 0 }}
+                    animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                    exit={{ opacity: 0, scale: 0.5, width: 0 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      data.onDelete?.();
+                    }}
+                    className={cn(
+                      'p-1 rounded-full transition-colors overflow-hidden',
+                      'bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400',
+                      'hover:bg-red-200 dark:hover:bg-red-800/50'
+                    )}
+                    title="Delete connection"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            /* Default/Else badge for question-sourced edges */
+            <div className="flex items-center gap-1">
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all',
+                  hasSiblingConditions
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700',
+                  !isOptionBased && (isHovered || selected) && 'cursor-pointer border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 shadow-sm'
+                )}
+                onClick={!isOptionBased && (isHovered || selected) ? () => setIsEditing(true) : undefined}
+              >
+                <span>{defaultLabel}</span>
+                <AnimatePresence>
+                  {!isOptionBased && (isHovered || selected) && !isEditing && (
+                    <motion.span
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: 'auto', opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      className="overflow-hidden whitespace-nowrap text-indigo-500 dark:text-indigo-400"
+                    >
+                      — add condition
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </div>
+              {/* Delete button on hover */}
+              <AnimatePresence>
+                {(isHovered || selected) && data?.onDelete && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.5, width: 0 }}
+                    animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                    exit={{ opacity: 0, scale: 0.5, width: 0 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      data.onDelete?.();
+                    }}
+                    className={cn(
+                      'p-1 rounded-full transition-colors overflow-hidden',
+                      'bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400',
+                      'hover:bg-red-200 dark:hover:bg-red-800/50'
+                    )}
+                    title="Delete connection"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
-          {/* Condition Editor Modal */}
+          {/* Condition Editor Modal — not for start edges or option-based auto-assigned */}
           <AnimatePresence>
-            {isEditing && (
+            {isEditing && !isFromStart && !isOptionBased && (
               <ConditionEditor
                 condition={data?.condition}
                 sourceNode={sourceNode}
@@ -209,6 +320,7 @@ function ConditionEditor({
   onSave,
   onClose,
 }: ConditionEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
   const [type, setType] = useState<ConditionType>(condition?.type || 'equals');
   const [value, setValue] = useState<string>(String(condition?.value || ''));
   const [optionId, setOptionId] = useState<string>(condition?.optionId || '');
@@ -218,6 +330,31 @@ function ConditionEditor({
   const [matchMode, setMatchMode] = useState<MatchMode>(
     condition?.matchMode || 'any'
   );
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   // Get options from source node if it's a multiple choice question
   const nodeData = sourceNode?.data as { options?: { id: string; text: string }[]; questionType?: string } | undefined;
@@ -275,6 +412,7 @@ function ConditionEditor({
 
   return (
     <motion.div
+      ref={editorRef}
       initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}

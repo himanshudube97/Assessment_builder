@@ -207,7 +207,6 @@ export function createQuestionNode(
         { id: `opt-${Date.now()}-yes`, text: 'Yes' },
         { id: `opt-${Date.now()}-no`, text: 'No' },
       ];
-      baseData.enableBranching = true;
       break;
     case 'number':
       baseData.placeholder = 'Enter a number...';

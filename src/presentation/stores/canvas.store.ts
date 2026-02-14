@@ -26,6 +26,72 @@ import {
 } from '@/domain/entities/flow';
 import { tidyLayout } from '@/lib/layout';
 
+// Types that get auto-assigned conditions per option (no manual condition editing)
+const OPTION_BASED_TYPES = new Set([
+  'yes_no',
+  'multiple_choice_single',
+  'dropdown',
+]);
+
+/**
+ * For option-based question types, find the next uncovered option
+ * and return a condition for it. Returns null if all options are covered
+ * or the source node is not option-based.
+ */
+function getAutoCondition(
+  sourceNode: RFNode,
+  existingEdges: RFEdge[],
+  edgeConditionMap: Record<string, EdgeCondition | null>,
+): EdgeCondition | null {
+  if (sourceNode.type !== 'question') return null;
+  const data = sourceNode.data as QuestionNodeData;
+  if (!OPTION_BASED_TYPES.has(data.questionType) || !data.options) return null;
+
+  // Collect option IDs already covered by existing conditional edges from this source
+  const coveredOptionIds = new Set<string>();
+  for (const edge of existingEdges) {
+    if (edge.source !== sourceNode.id) continue;
+    const cond = edge.data?.condition ?? edgeConditionMap[edge.id];
+    if (cond?.optionId) {
+      coveredOptionIds.add(cond.optionId);
+    }
+  }
+
+  // Find the first uncovered option
+  const nextOption = data.options.find((opt) => !coveredOptionIds.has(opt.id));
+  if (!nextOption) return null;
+
+  return {
+    type: 'equals',
+    value: nextOption.text,
+    optionId: nextOption.id,
+  };
+}
+
+/**
+ * Check if source node is option-based and all options are covered.
+ */
+function isAtOptionLimit(
+  sourceNode: RFNode,
+  existingEdges: RFEdge[],
+  edgeConditionMap: Record<string, EdgeCondition | null>,
+): boolean {
+  if (sourceNode.type !== 'question') return false;
+  const data = sourceNode.data as QuestionNodeData;
+  if (!OPTION_BASED_TYPES.has(data.questionType) || !data.options) return false;
+
+  const coveredOptionIds = new Set<string>();
+  for (const edge of existingEdges) {
+    if (edge.source !== sourceNode.id) continue;
+    const cond = edge.data?.condition ?? edgeConditionMap[edge.id];
+    if (cond?.optionId) {
+      coveredOptionIds.add(cond.optionId);
+    }
+  }
+
+  return data.options.every((opt) => coveredOptionIds.has(opt.id));
+}
+
 // Throttle utility for undo history recording
 function throttle<T extends unknown[]>(
   fn: (...args: T) => void,
@@ -71,9 +137,8 @@ interface CanvasState {
   // New node spotlight mode
   newlyAddedNodeId: string | null;
 
-  // Signal to FlowCanvas that a node's handles changed and React Flow
-  // needs to recalculate handle positions via updateNodeInternals()
-  nodeToUpdateInternals: string | null;
+  // Connection menu state
+  connectionMenuSourceId: string | null;
 
   // Derived: true when status is not 'draft' (flow structure is locked)
   isFlowLocked: boolean;
@@ -111,10 +176,6 @@ interface CanvasState {
   updateEdgeCondition: (edgeId: string, condition: EdgeCondition | null) => void;
   getEdgeCondition: (edgeId: string) => EdgeCondition | null;
 
-  // Branching toggle (migrates edges when switching)
-  toggleBranching: (nodeId: string, enable: boolean) => void;
-  canDisableBranching: (nodeId: string) => boolean;
-
   // Selection
   selectNode: (nodeId: string | null) => void;
   openPanel: () => void;
@@ -134,8 +195,14 @@ interface CanvasState {
   // Spotlight mode
   clearNewlyAddedNode: () => void;
 
-  // Handle internals update
-  clearNodeToUpdateInternals: () => void;
+  // Connection menu
+  openConnectionMenu: (nodeId: string) => void;
+  closeConnectionMenu: () => void;
+  addNodeWithEdge: (
+    type: 'question' | 'end',
+    sourceNodeId: string,
+    questionType?: QuestionType
+  ) => void;
 
   // Settings
   updateSettings: (partial: Partial<AssessmentSettings>) => void;
@@ -209,7 +276,7 @@ const initialState = {
   isSaving: false,
   lastSavedAt: null,
   newlyAddedNodeId: null,
-  nodeToUpdateInternals: null,
+  connectionMenuSourceId: null,
   isFlowLocked: false,
 };
 
@@ -262,22 +329,58 @@ export const useCanvasStore = create<CanvasState>()(
               }
             }
 
-            // Reconcile: if a node has branching enabled but edges still point to
-            // the bottom handle (sourceHandle: null), migrate them to the first option.
-            // This fixes data saved before the atomic-toggle fix.
+            // Migration: convert per-option branching edges to conditional edges.
+            // Old data used sourceHandle = option.id for per-option routing.
+            // New model uses conditional edges with { type: 'equals', value: optionText }.
             for (const node of rfNodes) {
               if (node.type !== 'question') continue;
               const data = node.data as QuestionNodeData;
-              const hasBranching =
-                data.questionType === 'yes_no' ||
-                (data.questionType === 'multiple_choice_single' && data.enableBranching);
-              if (hasBranching && data.options?.length) {
-                const firstOptId = data.options[0].id;
-                rfEdges = rfEdges.map((e) =>
-                  e.source === node.id && !e.sourceHandle
-                    ? { ...e, sourceHandle: firstOptId }
-                    : e
-                );
+
+              // Clear the legacy enableBranching flag
+              if (data.enableBranching) {
+                (data as unknown as Record<string, unknown>).enableBranching = false;
+              }
+
+              // Convert per-option edges to conditional edges
+              const optionEdges = rfEdges.filter(
+                (e) => e.source === node.id && e.sourceHandle
+              );
+              if (optionEdges.length > 0 && data.options) {
+                for (const edge of optionEdges) {
+                  const matchedOption = data.options.find(
+                    (opt) => opt.id === edge.sourceHandle
+                  );
+                  if (matchedOption) {
+                    const condition: EdgeCondition = {
+                      type: 'equals',
+                      value: matchedOption.text,
+                      optionId: matchedOption.id,
+                    };
+                    newConditionMap[edge.id] = condition;
+                    edge.data = { ...edge.data, condition };
+                  }
+                  edge.sourceHandle = null;
+                }
+
+                // Deduplicate: if multiple edges from same source→target, keep one with condition
+                const seen = new Map<string, number>();
+                rfEdges = rfEdges.filter((e, idx) => {
+                  if (e.source !== node.id) return true;
+                  const key = `${e.source}->${e.target}`;
+                  const prevIdx = seen.get(key);
+                  if (prevIdx !== undefined) {
+                    // Keep the one with a condition, drop the other
+                    const prev = rfEdges[prevIdx];
+                    if (e.data?.condition && !prev.data?.condition) {
+                      // Replace prev with current
+                      seen.set(key, idx);
+                      return true;
+                    }
+                    return false;
+                  }
+                  seen.set(key, idx);
+                  return true;
+                });
               }
             }
 
@@ -316,16 +419,31 @@ export const useCanvasStore = create<CanvasState>()(
 
           onConnect: (connection) => {
             if (get().isFlowLocked) return;
-            set((state) => ({
-              edges: addEdge(
-                {
-                  ...connection,
-                  id: generateEdgeId(connection.source!, connection.target!),
-                  type: 'conditionEdge',
-                  style: { strokeWidth: 2 },
-                },
-                state.edges
-              ),
+            const state = get();
+            const sourceNode = state.nodes.find((n) => n.id === connection.source);
+
+            // Auto-assign condition for option-based question types
+            let autoCondition: EdgeCondition | null = null;
+            if (sourceNode) {
+              // Block if all options already covered
+              if (isAtOptionLimit(sourceNode, state.edges, state.edgeConditionMap)) return;
+              autoCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
+            }
+
+            const edgeId = generateEdgeId(connection.source!, connection.target!);
+            const newEdge = {
+              ...connection,
+              id: edgeId,
+              type: 'conditionEdge',
+              style: { strokeWidth: 2 },
+              ...(autoCondition ? { data: { condition: autoCondition } } : {}),
+            };
+
+            set((s) => ({
+              edges: addEdge(newEdge, s.edges),
+              ...(autoCondition
+                ? { edgeConditionMap: { ...s.edgeConditionMap, [edgeId]: autoCondition } }
+                : {}),
               isDirty: true,
             }));
           },
@@ -404,90 +522,6 @@ export const useCanvasStore = create<CanvasState>()(
             return get().edgeConditionMap[edgeId] || null;
           },
 
-          toggleBranching: (nodeId, enable) => {
-            if (get().isFlowLocked) return;
-            const state = get();
-            const node = state.nodes.find((n) => n.id === nodeId);
-            if (!node) return;
-
-            const nodeData = node.data as QuestionNodeData;
-            const firstOptionId = nodeData.options?.[0]?.id ?? null;
-
-            // Clone condition map so remakeEdge can mutate it locally
-            const conditionMap = { ...state.edgeConditionMap };
-
-            // Helper: recreate an edge with a new ID so React Flow re-routes it
-            const remakeEdge = (e: RFEdge, newSourceHandle: string | null): RFEdge => {
-              const newId = generateEdgeId(e.source, e.target);
-              // Migrate any stored condition to the new edge ID
-              const condition = conditionMap[e.id];
-              if (condition) {
-                conditionMap[newId] = condition;
-                delete conditionMap[e.id];
-              }
-              return {
-                ...e,
-                id: newId,
-                sourceHandle: newSourceHandle,
-                data: { ...e.data, condition: condition ?? null },
-              };
-            };
-
-            if (enable && firstOptionId) {
-              // Atomic update: enable branching on node AND migrate edges in one render cycle
-              set((s) => ({
-                nodes: s.nodes.map((n) =>
-                  n.id === nodeId
-                    ? { ...n, data: { ...n.data, enableBranching: true } as RFNode['data'] }
-                    : n
-                ),
-                edges: s.edges.map((e) =>
-                  e.source === nodeId && !e.sourceHandle
-                    ? remakeEdge(e, firstOptionId)
-                    : e
-                ),
-                edgeConditionMap: conditionMap,
-                isDirty: true,
-                nodeToUpdateInternals: nodeId,
-              }));
-            } else if (!enable) {
-              // Atomic update: disable branching on node AND migrate edges in one render cycle
-              const seen = new Set<string>();
-              set((s) => ({
-                nodes: s.nodes.map((n) =>
-                  n.id === nodeId
-                    ? { ...n, data: { ...n.data, enableBranching: false } as RFNode['data'] }
-                    : n
-                ),
-                edges: s.edges.reduce<RFEdge[]>((acc, e) => {
-                  if (e.source === nodeId && e.sourceHandle) {
-                    if (!seen.has(e.target)) {
-                      seen.add(e.target);
-                      acc.push(remakeEdge(e, null));
-                    }
-                  } else {
-                    acc.push(e);
-                  }
-                  return acc;
-                }, []),
-                edgeConditionMap: conditionMap,
-                isDirty: true,
-                nodeToUpdateInternals: nodeId,
-              }));
-            }
-          },
-
-          canDisableBranching: (nodeId) => {
-            const state = get();
-            // Count how many distinct targets are connected from per-option handles
-            const branchEdges = state.edges.filter(
-              (e) => e.source === nodeId && e.sourceHandle
-            );
-            const uniqueTargets = new Set(branchEdges.map((e) => e.target));
-            // Allow disable only if 0 or 1 unique target (safe to collapse)
-            return uniqueTargets.size <= 1;
-          },
-
           selectNode: (nodeId) => {
             set({
               selectedNodeId: nodeId,
@@ -527,8 +561,76 @@ export const useCanvasStore = create<CanvasState>()(
             set({ newlyAddedNodeId: null });
           },
 
-          clearNodeToUpdateInternals: () => {
-            set({ nodeToUpdateInternals: null });
+          openConnectionMenu: (nodeId) => {
+            set({ connectionMenuSourceId: nodeId });
+          },
+
+          closeConnectionMenu: () => {
+            set({ connectionMenuSourceId: null });
+          },
+
+          addNodeWithEdge: (type, sourceNodeId, questionType) => {
+            if (get().isFlowLocked) return;
+            const state = get();
+            const sourceNode = state.nodes.find((n) => n.id === sourceNodeId);
+            if (!sourceNode) return;
+
+            // Block if all options already covered for option-based types
+            if (isAtOptionLimit(sourceNode, state.edges, state.edgeConditionMap)) return;
+
+            // Auto-assign condition for option-based question types
+            const autoCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
+
+            // Position the new node to the right of the source, avoiding overlaps
+            const baseX = sourceNode.position.x + 350;
+            const baseY = sourceNode.position.y;
+            const NODE_WIDTH = 280;
+            const NODE_HEIGHT = 200;
+
+            let position = { x: baseX, y: baseY };
+            let attempts = 0;
+            while (attempts < 20) {
+              const overlaps = state.nodes.some((n) => {
+                const dx = Math.abs(n.position.x - position.x);
+                const dy = Math.abs(n.position.y - position.y);
+                return dx < NODE_WIDTH && dy < NODE_HEIGHT;
+              });
+              if (!overlaps) break;
+              position = { x: baseX, y: position.y + NODE_HEIGHT + 40 };
+              attempts++;
+            }
+
+            const node =
+              type === 'end'
+                ? createEndNode(position)
+                : questionType
+                  ? createQuestionNode(position, questionType)
+                  : createQuestionNode(position);
+            const rfNode = toRFNode(node);
+
+            const edgeId = generateEdgeId(sourceNodeId, node.id);
+            const newEdge: RFEdge = {
+              id: edgeId,
+              source: sourceNodeId,
+              target: node.id,
+              sourceHandle: null,
+              type: 'conditionEdge',
+              style: { strokeWidth: 2 },
+              ...(autoCondition ? { data: { condition: autoCondition } } : {}),
+            };
+
+            set((s) => ({
+              nodes: [...s.nodes, rfNode],
+              edges: [...s.edges, newEdge],
+              ...(autoCondition
+                ? { edgeConditionMap: { ...s.edgeConditionMap, [edgeId]: autoCondition } }
+                : {}),
+              selectedNodeId: node.id,
+              isPanelOpen: true,
+              isDirty: true,
+              newlyAddedNodeId: node.id,
+              connectionMenuSourceId: null,
+            }));
           },
 
           updateSettings: (partial) => {
@@ -587,3 +689,15 @@ export const useSelectedNode = () => {
 export const useIsDirty = () => useCanvasStore((s) => s.isDirty);
 export const useIsSaving = () => useCanvasStore((s) => s.isSaving);
 export const useIsFlowLocked = () => useCanvasStore((s) => s.isFlowLocked);
+
+/** Check if a node's outgoing edges have covered all its options (for option-based types). */
+export const useIsNodeAtOptionLimit = (nodeId: string): boolean => {
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const edgeConditionMap = useCanvasStore((s) => s.edgeConditionMap);
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return false;
+  return isAtOptionLimit(node, edges, edgeConditionMap);
+};
+
+export { OPTION_BASED_TYPES };
