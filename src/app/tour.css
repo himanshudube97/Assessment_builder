@@ -125,12 +125,23 @@
 /* Overlay */
 .driver-overlay {
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+  /* Removed backdrop-filter blur for cleaner appearance */
 }
 
 /* Highlighted element */
 .driver-active-element {
   z-index: 9999 !important;
+}
+
+/* Force + button visibility during tour */
+[data-tour="node-connect-hint"].driver-active-element,
+.driver-active-element [data-tour="node-connect-hint"],
+.driver-active button[data-tour="node-connect-hint"] {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 10000 !important;
 }
 
 /* Keyboard shortcut styling in descriptions */
@@ -165,15 +176,20 @@
 /* Animate the popover entrance */
 .driver-popover {
   animation: driverPopoverIn 0.2s ease-out;
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force GPU acceleration for sharper rendering */
+  backface-visibility: hidden; /* Prevent flickering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes driverPopoverIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-4px);
+    transform: translateZ(0) translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateZ(0) translateY(0);
   }
 }
