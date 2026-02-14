@@ -7,6 +7,7 @@
  */
 
 import { memo, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -19,6 +20,7 @@ import { X, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCanvasStore } from '@/presentation/stores/canvas.store';
+import { ConfirmDialog } from './ConfirmDialog';
 import type { EdgeCondition, ConditionType, MatchMode } from '@/domain/entities/flow';
 
 interface EdgeData {
@@ -45,6 +47,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
 }: EdgeProps<EdgeData>) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { getNode } = useReactFlow();
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -150,7 +153,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        data.onDelete?.();
+                        setShowDeleteConfirm(true);
                       }}
                       className={cn(
                         'p-1.5 rounded-full transition-all',
@@ -195,7 +198,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                     exit={{ opacity: 0, scale: 0.5, width: 0 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onDelete?.();
+                      setShowDeleteConfirm(true);
                     }}
                     className={cn(
                       'p-1 rounded-full transition-colors overflow-hidden',
@@ -245,7 +248,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                     exit={{ opacity: 0, scale: 0.5, width: 0 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onDelete?.();
+                      setShowDeleteConfirm(true);
                     }}
                     className={cn(
                       'p-1 rounded-full transition-colors overflow-hidden',
@@ -278,6 +281,18 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
             )}
           </AnimatePresence>
         </div>
+
+        {/* Edge delete confirmation dialog */}
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          title="Delete this connection?"
+          message="This will remove the connection and any condition set on it. This action can be undone."
+          onConfirm={() => {
+            setShowDeleteConfirm(false);
+            data?.onDelete?.();
+          }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
       </EdgeLabelRenderer>
     </>
   );
@@ -338,6 +353,7 @@ function ConditionEditor({
   const [matchMode, setMatchMode] = useState<MatchMode>(
     condition?.matchMode || 'any'
   );
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   // Get sibling edges for duplicate checking
   const edges = useCanvasStore((s) => s.edges);
   const edgeConditionMap = useCanvasStore((s) => s.edgeConditionMap);
@@ -345,22 +361,6 @@ function ConditionEditor({
   const siblingEdges = edges.filter(
     (e) => e.source === sourceNodeId && e.id !== edgeId
   );
-
-  // Close on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [onClose]);
 
   // Close on Escape
   useEffect(() => {
@@ -466,145 +466,180 @@ function ConditionEditor({
   };
 
   const handleRemove = () => {
-    onSave(null);
+    setShowRemoveConfirm(true);
   };
 
-  return (
+  return createPortal(
     <motion.div
-      ref={editorRef}
-      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      className={cn(
-        'absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50',
-        'w-72 p-3 rounded-xl bg-card border border-border shadow-xl'
-      )}
-      onClick={(e) => e.stopPropagation()}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-[9998] flex items-center justify-center"
+      onClick={onClose}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-medium text-sm text-foreground">Set Condition</h4>
-        <button
-          onClick={onClose}
-          className="p-1 rounded hover:bg-muted transition-colors"
-        >
-          <X className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </div>
+      {/* Backdrop blur */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
 
-      <div className="space-y-3">
-        {/* Condition Type */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            When answer
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as ConditionType)}
-            className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      {/* Editor card */}
+      <motion.div
+        ref={editorRef}
+        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          'relative w-80 max-h-[80vh] rounded-xl bg-card border border-border shadow-2xl',
+          'flex flex-col'
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Zap className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400" />
+            </div>
+            <h4 className="font-semibold text-sm text-foreground">Set Condition</h4>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-muted transition-colors"
           >
-            <option value="equals">Equals</option>
-            <option value="not_equals">Does not equal</option>
-            {!isMultipleChoice && (
-              <>
-                {!isNumeric && <option value="contains">Contains</option>}
-                <option value="greater_than">Greater than</option>
-                <option value="less_than">Less than</option>
-              </>
-            )}
-          </select>
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
 
-        {/* Match Mode for Multi-Select */}
-        {isMultiSelect && (
+        {/* Scrollable content */}
+        <div className="overflow-y-auto px-4 pb-4 space-y-3">
+          {/* Condition Type */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Match mode
+              When answer
             </label>
             <select
-              value={matchMode}
-              onChange={(e) => setMatchMode(e.target.value as MatchMode)}
+              value={type}
+              onChange={(e) => setType(e.target.value as ConditionType)}
               className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="any">Any of selected</option>
-              <option value="all">All of selected</option>
-              <option value="exactly">Exactly selected</option>
+              <option value="equals">Equals</option>
+              <option value="not_equals">Does not equal</option>
+              {!isMultipleChoice && (
+                <>
+                  {!isNumeric && <option value="contains">Contains</option>}
+                  <option value="greater_than">Greater than</option>
+                  <option value="less_than">Less than</option>
+                </>
+              )}
             </select>
           </div>
-        )}
 
-        {/* Value */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            {isMultiSelect ? 'Select options' : 'Value'}
-          </label>
-          {isMultiSelect && options.length > 0 ? (
-            <div className="space-y-1.5 max-h-32 overflow-y-auto">
-              {options.map((opt) => (
-                <label
-                  key={opt.id}
-                  className={cn(
-                    'flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors',
-                    selectedOptionIds.includes(opt.id)
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                      : 'hover:bg-muted'
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedOptionIds.includes(opt.id)}
-                    onChange={() => toggleOption(opt.id)}
-                    className="rounded border-input"
-                  />
-                  <span className="text-sm truncate">{opt.text}</span>
-                </label>
-              ))}
+          {/* Match Mode for Multi-Select */}
+          {isMultiSelect && (
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Match mode
+              </label>
+              <select
+                value={matchMode}
+                onChange={(e) => setMatchMode(e.target.value as MatchMode)}
+                className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="any">Any of selected</option>
+                <option value="all">All of selected</option>
+                <option value="exactly">Exactly selected</option>
+              </select>
             </div>
-          ) : isSingleSelect && options.length > 0 ? (
-            <select
-              value={optionId}
-              onChange={(e) => {
-                setOptionId(e.target.value);
-                const opt = options.find((o) => o.id === e.target.value);
-                if (opt) setValue(opt.text);
-              }}
-              className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select option...</option>
-              {options.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.text}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type={isRating || isNumeric ? 'number' : 'text'}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={isRating || isNumeric ? 'e.g., 3' : 'e.g., Yes'}
-              className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
           )}
+
+          {/* Value */}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              {isMultiSelect ? 'Select options' : 'Value'}
+            </label>
+            {isMultiSelect && options.length > 0 ? (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {options.map((opt) => (
+                  <label
+                    key={opt.id}
+                    className={cn(
+                      'flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors',
+                      selectedOptionIds.includes(opt.id)
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                        : 'hover:bg-muted'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedOptionIds.includes(opt.id)}
+                      onChange={() => toggleOption(opt.id)}
+                      className="rounded border-input"
+                    />
+                    <span className="text-sm truncate">{opt.text}</span>
+                  </label>
+                ))}
+              </div>
+            ) : isSingleSelect && options.length > 0 ? (
+              <select
+                value={optionId}
+                onChange={(e) => {
+                  setOptionId(e.target.value);
+                  const opt = options.find((o) => o.id === e.target.value);
+                  if (opt) setValue(opt.text);
+                }}
+                className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select option...</option>
+                {options.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.text}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={isRating || isNumeric ? 'number' : 'text'}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={isRating || isNumeric ? 'e.g., 3' : 'e.g., Yes'}
+                className="w-full px-2 py-1.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={handleSave}
+              className="flex-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Save
+            </button>
+            {condition && (
+              <button
+                onClick={handleRemove}
+                className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
-          <button
-            onClick={handleSave}
-            className="flex-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Save
-          </button>
-          {condition && (
-            <button
-              onClick={handleRemove}
-              className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
-            >
-              Remove
-            </button>
-          )}
-        </div>
-      </div>
-    </motion.div>
+        {/* Condition remove confirmation dialog */}
+        <ConfirmDialog
+          open={showRemoveConfirm}
+          title="Remove this condition?"
+          message="The connection will remain but the condition will be removed. This action can be undone."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            setShowRemoveConfirm(false);
+            onSave(null);
+          }}
+          onCancel={() => setShowRemoveConfirm(false)}
+        />
+      </motion.div>
+    </motion.div>,
+    document.body
   );
 }

@@ -5,13 +5,14 @@
  * Shared base for all node types in the canvas
  */
 
-import { memo, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Handle, Position } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GripVertical, Trash2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCanvasStore, useIsNodeAtOptionLimit } from '@/presentation/stores/canvas.store';
 import { ConnectionMenu } from './ConnectionMenu';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface BaseNodeProps {
   id: string;
@@ -61,13 +62,15 @@ export const BaseNode = memo(function BaseNode({
   const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
   const atOptionLimit = useIsNodeAtOptionLimit(id);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const isNewlyAdded = id === newlyAddedNodeId;
   const showConnectionMenu = connectionMenuSourceId === id;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (type === 'start') return;
-    deleteNode(id);
+    setShowDeleteConfirm(true);
   };
 
   const handleClick = () => {
@@ -184,6 +187,18 @@ export const BaseNode = memo(function BaseNode({
           </AnimatePresence>
         </>
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete this node?"
+        message="This will also remove all connections to and from this node. This action can be undone."
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          deleteNode(id);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </motion.div>
   );
 });
