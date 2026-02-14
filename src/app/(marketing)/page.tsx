@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 import {
-  GitBranch,
   GraduationCap,
   Users,
   Heart,
@@ -37,26 +36,23 @@ const staggerContainer = {
   },
 };
 
-// Comparison row for linear vs Assessio
-function ComparisonRow({ linear, flowform, delay }: { linear: string; flowform: string; delay: number }) {
+// Bullet item for comparison lists
+function BulletItem({ text, type, delay }: { text: string; type: 'bad' | 'good'; delay: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
+    <motion.li
+      initial={{ opacity: 0, x: -10 }}
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.4, delay }}
-      className="grid grid-cols-[1fr,auto,1fr] items-center gap-4 py-3 border-b border-border/50 last:border-0"
+      transition={{ duration: 0.3, delay }}
+      className="flex items-start gap-2.5"
     >
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <X className="w-4 h-4 text-red-400 flex-shrink-0" />
-        <span className="text-sm">{linear}</span>
-      </div>
-      <div className="w-px h-6 bg-border" />
-      <div className="flex items-center gap-2 text-foreground">
-        <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-        <span className="text-sm font-medium">{flowform}</span>
-      </div>
-    </motion.div>
+      {type === 'bad' ? (
+        <X className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+      ) : (
+        <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+      )}
+      <span className={type === 'bad' ? 'text-muted-foreground' : 'text-foreground font-medium'}>{text}</span>
+    </motion.li>
   );
 }
 
@@ -261,135 +257,70 @@ export default function LandingPage() {
 
       {/* Problem vs Solution */}
       <Section>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left: comparison table */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-xs font-semibold uppercase tracking-wider mb-4">
-              The problem
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Linear forms are <span className="line-through text-muted-foreground/60">boring</span> limiting
-            </h2>
-            <p className="text-muted-foreground mb-8 leading-relaxed">
-              Everyone gets the same questions in the same order. No personalization, no logic, no adaptivity.
-            </p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+            Linear forms are <span className="line-through text-muted-foreground/60">boring</span> limiting
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            Everyone gets the same questions in the same order. No personalization, no logic, no adaptivity.
+          </p>
+        </motion.div>
 
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-4 pb-3 mb-1 border-b border-border">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Linear Forms</span>
-                <div className="w-px h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-500">Assessio</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {/* Linear Forms - the bad */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6"
+          >
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <X className="w-4 h-4 text-red-400" />
               </div>
-              <ComparisonRow linear="Same path for everyone" flowform="Dynamic branching logic" delay={0.1} />
-              <ComparisonRow linear="No scoring or grading" flowform="Per-option scoring & NPS" delay={0.15} />
-              <ComparisonRow linear="Basic form styling" flowform="6 themes + full customization" delay={0.2} />
-              <ComparisonRow linear="Spreadsheet responses" flowform="Analytics dashboard + CSV" delay={0.25} />
-              <ComparisonRow linear="Link sharing only" flowform="Link, embed, QR code" delay={0.3} />
+              <span className="text-sm font-semibold uppercase tracking-wider text-red-500">Linear Forms</span>
             </div>
+            <ul className="space-y-3">
+              <BulletItem text="Same path for everyone" type="bad" delay={0.1} />
+              <BulletItem text="No scoring or grading" type="bad" delay={0.15} />
+              <BulletItem text="Basic form styling" type="bad" delay={0.2} />
+              <BulletItem text="Spreadsheet responses" type="bad" delay={0.25} />
+              <BulletItem text="Link sharing only" type="bad" delay={0.3} />
+            </ul>
           </motion.div>
 
-          {/* Right: visual illustration */}
+          {/* Assessio - the good */}
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-6 relative"
           >
-            {/* Background glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-violet-500/10 to-indigo-500/5 rounded-3xl blur-2xl" />
+            {/* Subtle glow */}
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-indigo-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 blur-sm transition-opacity" />
 
-            <div className="relative rounded-2xl border border-border bg-card p-6 md:p-8">
-              {/* Mini flow visualization */}
-              <div className="space-y-4">
-                {/* Start node */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.3 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="flex-1 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-4 py-2">
-                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Welcome Screen</span>
-                  </div>
-                </motion.div>
-
-                {/* Arrow */}
-                <motion.div
-                  initial={{ scaleY: 0 }}
-                  whileInView={{ scaleY: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.4 }}
-                  className="flex justify-center"
-                  style={{ originY: 0 }}
-                >
-                  <div className="w-px h-6 bg-gradient-to-b from-emerald-500/40 to-indigo-500/40" />
-                </motion.div>
-
-                {/* Question node */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
-                    <GitBranch className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <div className="flex-1 rounded-lg bg-indigo-500/5 border border-indigo-500/20 px-4 py-2">
-                    <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">&ldquo;What&apos;s your role?&rdquo;</span>
-                  </div>
-                </motion.div>
-
-                {/* Branch arrows */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.6 }}
-                  className="grid grid-cols-2 gap-3 pl-12"
-                >
-                  <div className="space-y-2">
-                    <div className="w-full h-px bg-gradient-to-r from-indigo-500/40 to-violet-500/40" />
-                    <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-3 py-2 text-center">
-                      <span className="text-xs text-muted-foreground">Developer</span>
-                      <div className="text-[10px] text-violet-500 mt-0.5">→ Technical questions</div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="w-full h-px bg-gradient-to-r from-indigo-500/40 to-emerald-500/40" />
-                    <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-3 py-2 text-center">
-                      <span className="text-xs text-muted-foreground">Designer</span>
-                      <div className="text-[10px] text-emerald-500 mt-0.5">→ Design questions</div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Animated dot traveling */}
-                <motion.div
-                  className="absolute left-1/2 w-2 h-2 rounded-full bg-indigo-500 shadow-lg shadow-indigo-500/50"
-                  animate={{
-                    y: [0, 30, 60, 90, 120],
-                    opacity: [0, 1, 1, 1, 0],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                    delay: 1,
-                  }}
-                />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <Check className="w-4 h-4 text-emerald-500" />
+                </div>
+                <span className="text-sm font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Assessio</span>
               </div>
+              <ul className="space-y-3">
+                <BulletItem text="Dynamic branching logic" type="good" delay={0.15} />
+                <BulletItem text="Per-option scoring & NPS" type="good" delay={0.2} />
+                <BulletItem text="6 themes + full customization" type="good" delay={0.25} />
+                <BulletItem text="Analytics dashboard + CSV" type="good" delay={0.3} />
+                <BulletItem text="Link, embed, QR code" type="good" delay={0.35} />
+              </ul>
             </div>
           </motion.div>
         </div>
