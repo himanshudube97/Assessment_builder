@@ -136,17 +136,6 @@ export function createDefaultNodes(): FlowNode[] {
         buttonText: 'Start',
       },
     },
-    {
-      id: 'end-node',
-      type: 'end',
-      position: { x: 250, y: 400 },
-      data: {
-        title: 'Thank You!',
-        description: 'Your response has been recorded.',
-        showScore: false,
-        redirectUrl: null,
-      },
-    },
   ];
 }
 
@@ -154,15 +143,7 @@ export function createDefaultNodes(): FlowNode[] {
  * Default edges for a new assessment
  */
 export function createDefaultEdges(): FlowEdge[] {
-  return [
-    {
-      id: 'edge-start-end',
-      source: 'start-node',
-      target: 'end-node',
-      sourceHandle: null,
-      condition: null,
-    },
-  ];
+  return [];
 }
 
 /**
