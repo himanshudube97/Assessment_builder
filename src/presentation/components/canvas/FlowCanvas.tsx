@@ -16,9 +16,10 @@ import ReactFlow, {
   useUpdateNodeInternals,
   type Edge,
   type Connection,
+  type Node as RFNode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid, Undo2, Redo2, Search, ArrowRight, ArrowDown, Plus, Flag, ChevronDown, Rows3, HelpCircle, GitBranch } from 'lucide-react';
+import { LayoutGrid, Undo2, Redo2, Search, ArrowRight, ArrowDown, Plus, Flag, ChevronDown, Rows3, HelpCircle, GitBranch, Workflow } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,15 @@ const EDGE_TYPE_OPTIONS: { value: EdgeType; label: string; description: string }
   { value: 'smoothstep', label: 'Smooth Step', description: 'Rounded orthogonal' },
   { value: 'step', label: 'Step', description: 'Sharp orthogonal' },
   { value: 'straight', label: 'Straight', description: 'Direct diagonal lines' },
+];
+
+type BranchMode = 'all' | 'full' | 'downstream' | 'upstream';
+
+const BRANCH_MODE_OPTIONS: { value: BranchMode; label: string; description: string }[] = [
+  { value: 'all', label: 'All', description: 'Show all nodes' },
+  { value: 'full', label: 'Full Branch', description: 'Show entire flow path' },
+  { value: 'downstream', label: 'Downstream', description: 'Show what comes after' },
+  { value: 'upstream', label: 'Upstream', description: 'Show what comes before' },
 ];
 
 function SpacingDropdown({ onSelect }: { onSelect: (spacing: Spacing) => void }) {
@@ -176,6 +186,64 @@ function EdgeTypeDropdown({ onSelect, current }: { onSelect: (type: EdgeType) =>
   );
 }
 
+function BranchModeDropdown({ onSelect, current }: { onSelect: (mode: BranchMode) => void; current: BranchMode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex items-center gap-2 px-3 py-2 rounded-xl bg-card/80 backdrop-blur-sm border border-border/60 text-sm font-semibold text-foreground hover:bg-card hover:border-border hover:shadow-md transition-all duration-200 shadow-sm hover:scale-[1.02]',
+          open && 'ring-2 ring-primary/40 shadow-md scale-[1.02]',
+        )}
+        title="Highlight mode (click a node to highlight)"
+      >
+        <Workflow className="h-4 w-4" />
+        Highlight
+        <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-200', open && 'rotate-180')} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/60 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ring-1 ring-black/5 overflow-hidden z-50"
+          >
+            <div className="p-1.5">
+              {BRANCH_MODE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => { onSelect(opt.value); setOpen(false); }}
+                  className={cn(
+                    'w-full flex flex-col px-3 py-2.5 rounded-xl text-left hover:bg-muted/80 transition-all duration-200 hover:scale-[1.02] group',
+                    current === opt.value && 'bg-primary/10 border border-primary/20'
+                  )}
+                >
+                  <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{opt.label}</span>
+                  <span className="text-[11px] text-muted-foreground mt-0.5">{opt.description}</span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function FlowCanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project, fitView } = useReactFlow();
@@ -204,6 +272,10 @@ function FlowCanvasInner() {
   const newlyAddedNodeId = useCanvasStore((s) => s.newlyAddedNodeId);
   const clearNewlyAddedNode = useCanvasStore((s) => s.clearNewlyAddedNode);
   const isFlowLocked = useCanvasStore((s) => s.isFlowLocked);
+  const setBranchHighlight = useCanvasStore((s) => s.setBranchHighlight);
+  const clearBranchHighlight = useCanvasStore((s) => s.clearBranchHighlight);
+  const branchHighlightMode = useCanvasStore((s) => s.branchHighlightMode);
+  const setBranchHighlightMode = useCanvasStore((s) => s.setBranchHighlightMode);
 
   // Reactive undo/redo state
   const canUndo = useStore(useCanvasStore.temporal, (s) => s.pastStates.length > 0);
@@ -282,18 +354,23 @@ function FlowCanvasInner() {
   const onPaneClick = useCallback(() => {
     selectNode(null);
     setIsAddMenuOpen(false);
+    clearBranchHighlight();
     // Also dismiss spotlight when clicking on pane
     if (newlyAddedNodeId) {
       clearNewlyAddedNode();
     }
-  }, [selectNode, newlyAddedNodeId, clearNewlyAddedNode]);
+  }, [selectNode, newlyAddedNodeId, clearNewlyAddedNode, clearBranchHighlight]);
 
-  // Handle node click - dismiss spotlight
-  const handleNodeClick = useCallback(() => {
+  // Handle node click - highlight branch and dismiss spotlight
+  const handleNodeClick = useCallback((_event: React.MouseEvent, node: RFNode) => {
+    // Highlight the branch for this node
+    setBranchHighlight(node.id, branchHighlightMode);
+
+    // Dismiss spotlight
     if (newlyAddedNodeId) {
       clearNewlyAddedNode();
     }
-  }, [newlyAddedNodeId, clearNewlyAddedNode]);
+  }, [newlyAddedNodeId, clearNewlyAddedNode, setBranchHighlight, branchHighlightMode]);
 
   // Allow dragging edge endpoints to reconnect them (e.g. from Option A to Option B)
   const edgeReconnectSuccessful = useRef(true);
@@ -499,6 +576,7 @@ function FlowCanvasInner() {
               </button>
               <SpacingDropdown onSelect={(spacing) => fullLayout(undefined, spacing)} />
               <EdgeTypeDropdown onSelect={setEdgeType} current={edgeType} />
+              <BranchModeDropdown onSelect={setBranchHighlightMode} current={branchHighlightMode} />
             </div>
             {/* H/V direction toggle - refined premium style */}
             <div className="flex rounded-xl border border-border/60 bg-card/80 backdrop-blur-sm shadow-sm overflow-hidden" data-tour="layout-toggle">

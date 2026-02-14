@@ -54,6 +54,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { getNode } = useReactFlow();
   const searchHighlightIds = useCanvasStore((s) => s.searchHighlightIds);
+  const branchHighlightIds = useCanvasStore((s) => s.branchHighlightIds);
   const edgeType = useCanvasStore((s) => s.edgeType);
 
   // Compute edge dimming based on search: both ends dimmed = fully dim, one end = partial
@@ -61,6 +62,20 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const sourceInSearch = searchActive && searchHighlightIds.includes(source);
   const targetInSearch = searchActive && searchHighlightIds.includes(target);
   const edgeSearchOpacity = !searchActive ? 1 : (sourceInSearch || targetInSearch) ? 0.4 : 0.1;
+
+  // Compute edge dimming based on branch highlighting
+  const branchActive = branchHighlightIds !== null;
+  const edgeInBranch = branchActive && branchHighlightIds.edges.includes(id);
+  const edgeBranchOpacity = !branchActive ? 1 : edgeInBranch ? 1 : 0.3;
+
+  // Combined opacity (if either search or branch is active, use the minimum)
+  const finalOpacity = Math.min(edgeSearchOpacity, edgeBranchOpacity);
+
+  // Apply blur when dimmed
+  const shouldBlur = finalOpacity < 0.5;
+
+  // Edge is highlighted if branch highlighting is active and it's in the branch
+  const isEdgeHighlighted = branchActive && edgeInBranch;
 
   // Calculate edge path based on selected edge type
   const pathParams = {
@@ -144,16 +159,20 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
 
   return (
     <>
-      <g style={{ opacity: edgeSearchOpacity, transition: 'opacity 0.3s ease' }}>
-      {/* Subtle ambient glow for all edges - more pronounced on hover */}
+      <g style={{
+        opacity: finalOpacity,
+        filter: shouldBlur ? 'blur(2px)' : 'none',
+        transition: 'opacity 0.3s ease, filter 0.3s ease',
+      }}>
+      {/* Subtle ambient glow for all edges - more pronounced on hover/highlight */}
       <path
         d={edgePath}
         fill="none"
         stroke={glowColor}
-        strokeWidth={isActive ? 12 : 8}
+        strokeWidth={isActive ? 12 : isEdgeHighlighted ? 10 : 8}
         style={{
           filter: 'blur(6px)',
-          opacity: isActive ? 0.6 : 0.3,
+          opacity: isActive ? 0.6 : isEdgeHighlighted ? 0.45 : 0.3,
           transition: 'opacity 0.3s ease, stroke-width 0.3s ease',
         }}
       />
@@ -175,10 +194,10 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
         markerEnd={`url(#arrow-${isActive ? contextualColors.marker + '-active' : contextualColors.marker})`}
         style={{
           ...style,
-          strokeWidth: selected || isHovered ? 4 : 2.5,
+          strokeWidth: selected || isHovered ? 4 : isEdgeHighlighted ? 3 : 2.5,
           stroke: strokeColor,
           transition: 'stroke 0.3s ease, stroke-width 0.3s ease',
-          filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.05))',
+          filter: isActive || isEdgeHighlighted ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.05))',
         }}
       />
 
@@ -199,8 +218,8 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: edgeSearchOpacity < 0.2 ? 'none' : 'all',
-            opacity: edgeSearchOpacity,
+            pointerEvents: finalOpacity < 0.2 ? 'none' : 'all',
+            opacity: finalOpacity,
             transition: 'opacity 0.2s ease',
           }}
           className="nodrag nopan"

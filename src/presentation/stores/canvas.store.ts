@@ -25,6 +25,7 @@ import {
   generateEdgeId,
 } from '@/domain/entities/flow';
 import { tidyLayout, getLayoutedElements } from '@/lib/layout';
+import { getConnectedBranch } from '@/lib/graphTraversal';
 
 // Types that get auto-assigned conditions per option (no manual condition editing)
 const OPTION_BASED_TYPES = new Set([
@@ -143,6 +144,10 @@ interface CanvasState {
   // Search/filter state — null means no search active
   searchHighlightIds: string[] | null;
 
+  // Branch highlighting state — null means no branch highlighting active
+  branchHighlightIds: { nodes: string[]; edges: string[] } | null;
+  branchHighlightMode: 'all' | 'full' | 'downstream' | 'upstream';
+
   // Layout direction preference
   layoutDirection: 'LR' | 'TB';
 
@@ -209,6 +214,11 @@ interface CanvasState {
 
   // Search/filter
   setSearchHighlight: (ids: string[] | null) => void;
+
+  // Branch highlighting
+  setBranchHighlight: (nodeId: string | null, mode?: 'all' | 'full' | 'downstream' | 'upstream') => void;
+  clearBranchHighlight: () => void;
+  setBranchHighlightMode: (mode: 'all' | 'full' | 'downstream' | 'upstream') => void;
 
   // Connection menu
   openConnectionMenu: (nodeId: string) => void;
@@ -294,6 +304,8 @@ const initialState = {
   newlyAddedNodeId: null,
   connectionMenuSourceId: null,
   searchHighlightIds: null,
+  branchHighlightIds: null,
+  branchHighlightMode: 'all' as const,
   layoutDirection: 'LR' as const,
   edgeType: 'bezier' as const,
   isFlowLocked: false,
@@ -631,6 +643,32 @@ export const useCanvasStore = create<CanvasState>()(
 
           setSearchHighlight: (ids) => {
             set({ searchHighlightIds: ids });
+          },
+
+          setBranchHighlight: (nodeId, mode = 'full') => {
+            if (!nodeId || mode === 'all') {
+              set({ branchHighlightIds: null });
+              return;
+            }
+            const state = get();
+            const { nodeIds, edgeIds } = getConnectedBranch(
+              nodeId,
+              state.nodes,
+              state.edges,
+              mode
+            );
+            set({
+              branchHighlightIds: { nodes: nodeIds, edges: edgeIds },
+              branchHighlightMode: mode,
+            });
+          },
+
+          clearBranchHighlight: () => {
+            set({ branchHighlightIds: null });
+          },
+
+          setBranchHighlightMode: (mode) => {
+            set({ branchHighlightMode: mode });
           },
 
           openConnectionMenu: (nodeId) => {

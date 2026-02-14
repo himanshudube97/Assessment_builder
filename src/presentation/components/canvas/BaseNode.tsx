@@ -77,10 +77,18 @@ export const BaseNode = memo(function BaseNode({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const searchHighlightIds = useCanvasStore((s) => s.searchHighlightIds);
+  const branchHighlightIds = useCanvasStore((s) => s.branchHighlightIds);
 
   const isNewlyAdded = id === newlyAddedNodeId;
   const showConnectionMenu = connectionMenuSourceId === id;
   const isDimmedBySearch = searchHighlightIds !== null && !searchHighlightIds.includes(id);
+  const isDimmedByBranch = branchHighlightIds !== null && !branchHighlightIds.nodes.includes(id);
+
+  // Node is dimmed if either search or branch highlighting is active and it doesn't match
+  const isDimmed = isDimmedBySearch || isDimmedByBranch;
+
+  // Node is highlighted if branch highlighting is active and it's in the branch
+  const isHighlighted = branchHighlightIds !== null && branchHighlightIds.nodes.includes(id);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,8 +103,24 @@ export const BaseNode = memo(function BaseNode({
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+      animate={{
+        opacity: isDimmed ? 0.3 : 1,
+        y: 0,
+        filter: isDimmed ? 'blur(3px)' : 'blur(0px)',
+        scale: isHighlighted && !selected ? [1, 1.02, 1] : 1,
+      }}
+      transition={{
+        duration: 0.3,
+        ease: [0.23, 1, 0.32, 1],
+        scale: isHighlighted && !selected ? {
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        } : { duration: 0.3 }
+      }}
+      style={{
+        pointerEvents: isDimmed ? 'none' : 'auto',
+      }}
       className={cn(
         'group relative w-[280px] rounded-2xl border bg-card overflow-visible',
         'cursor-grab active:cursor-grabbing',
@@ -110,8 +134,8 @@ export const BaseNode = memo(function BaseNode({
           : `hover:${nodeShadows.hover}`,
         // Refined glow for newly added node
         isNewlyAdded && 'ring-4 ring-primary/30 shadow-[0_0_40px_rgba(99,102,241,0.25),0_0_12px_rgba(99,102,241,0.15)]',
-        // Dim when search is active and this node doesn't match
-        isDimmedBySearch && 'opacity-[0.15] pointer-events-none'
+        // Subtle glow for highlighted nodes in branch
+        isHighlighted && !selected && 'ring-2 ring-indigo-400/40 shadow-[0_0_20px_rgba(99,102,241,0.15)]'
       )}
       onClick={handleClick}
       data-tour={dataTour}
