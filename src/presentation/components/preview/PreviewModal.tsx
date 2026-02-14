@@ -339,6 +339,14 @@ export function PreviewModal({
 // Evaluate edge condition
 function evaluateCondition(condition: EdgeCondition, answer: Answer): boolean {
   const { type, value } = condition;
+
+  // OR matching: if value is an array, any match succeeds
+  if (Array.isArray(value)) {
+    return value.some((v) =>
+      evaluateCondition({ ...condition, value: v }, answer)
+    );
+  }
+
   const answerStr = Array.isArray(answer) ? answer.join(',') : String(answer);
   const valueStr = String(value);
 

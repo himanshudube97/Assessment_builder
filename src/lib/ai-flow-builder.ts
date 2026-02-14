@@ -110,32 +110,117 @@ export function buildFlowFromAIOutput(output: AIAssessmentOutput): BuildResult {
   );
 
   // 5. Add branching edges (additive on top of the linear chain)
+  //
+  // Strategy: For option-based types (yes_no, multiple_choice_single, dropdown)
+  // with "equals" conditions, use per-option sourceHandle branching instead of
+  // edge conditions. This avoids redundant condition labels on the canvas.
+  // For all other types (number, rating, text, etc.), use edge conditions.
+
+  const OPTION_BASED_TYPES = new Set([
+    'yes_no',
+    'multiple_choice_single',
+    'dropdown',
+  ]);
+
+  // Group branches by source node to handle per-option branching holistically
+  const branchesBySource = new Map<string, typeof output.branching>();
   for (const branch of output.branching) {
-    const sourceId = idMap.get(branch.from);
-    const targetId =
-      branch.goto === 'end' ? endNode.id : idMap.get(branch.goto);
+    const list = branchesBySource.get(branch.from) || [];
+    list.push(branch);
+    branchesBySource.set(branch.from, list);
+  }
 
-    if (!sourceId || !targetId) continue;
+  for (const [aiSourceId, branches] of branchesBySource) {
+    const sourceId = idMap.get(aiSourceId);
+    if (!sourceId) continue;
 
-    // Skip if an edge with this source→target already exists
-    const existing = edges.find(
-      (e) => e.source === sourceId && e.target === targetId
-    );
-    if (existing) {
-      // Update the existing edge's condition instead of adding a duplicate
-      existing.condition = {
-        type: branch.condition as ConditionType,
-        value: branch.value,
-      };
-      continue;
+    const sourceQuestion = output.questions.find((q) => q.id === aiSourceId);
+    const sourceNode = questionNodes.find((n) => n.id === sourceId);
+    if (!sourceQuestion || !sourceNode) continue;
+
+    const data = sourceNode.data as QuestionNodeData;
+    const isOptionType =
+      OPTION_BASED_TYPES.has(sourceQuestion.type) && data.options;
+
+    if (isOptionType && branches.every((b) => b.condition === 'equals')) {
+      // --- Per-option branching ---
+      data.enableBranching = true;
+
+      // Find the linear chain edge from this node (sourceHandle: null)
+      const linearEdgeIdx = edges.findIndex(
+        (e) => e.source === sourceId && !e.sourceHandle && !e.condition
+      );
+      const linearTarget =
+        linearEdgeIdx !== -1 ? edges[linearEdgeIdx].target : null;
+
+      // Build a map of optionId → target for explicit branches
+      const optionTargetMap = new Map<string, string>();
+      for (const branch of branches) {
+        const targetId =
+          branch.goto === 'end' ? endNode.id : idMap.get(branch.goto);
+        if (!targetId) continue;
+
+        const matchedOption = data.options!.find(
+          (opt) => opt.text === String(branch.value)
+        );
+        if (matchedOption) {
+          optionTargetMap.set(matchedOption.id, targetId);
+        }
+      }
+
+      // Create edges for every option
+      for (const option of data.options!) {
+        const target = optionTargetMap.get(option.id) || linearTarget;
+        if (!target) continue;
+
+        // Check if this reuses the existing linear edge target
+        const existingIdx = edges.findIndex(
+          (e) =>
+            e.source === sourceId &&
+            e.target === target &&
+            !e.sourceHandle
+        );
+        if (existingIdx !== -1) {
+          // Reuse and set sourceHandle
+          edges[existingIdx].sourceHandle = option.id;
+        } else {
+          edges.push(createEdge(sourceId, target, null, option.id));
+        }
+      }
+
+      // Remove the original linear chain edge if it still has sourceHandle: null
+      // (it was either reused above or is now redundant)
+      const remainingLinearIdx = edges.findIndex(
+        (e) => e.source === sourceId && !e.sourceHandle && !e.condition
+      );
+      if (remainingLinearIdx !== -1) {
+        edges.splice(remainingLinearIdx, 1);
+      }
+    } else {
+      // --- Edge condition branching (number, rating, text, etc.) ---
+      for (const branch of branches) {
+        const targetId =
+          branch.goto === 'end' ? endNode.id : idMap.get(branch.goto);
+        if (!targetId) continue;
+
+        const existing = edges.find(
+          (e) => e.source === sourceId && e.target === targetId
+        );
+        if (existing) {
+          existing.condition = {
+            type: branch.condition as ConditionType,
+            value: branch.value,
+          };
+          continue;
+        }
+
+        const condition: EdgeCondition = {
+          type: branch.condition as ConditionType,
+          value: branch.value,
+        };
+        edges.push(createEdge(sourceId, targetId, condition));
+      }
     }
-
-    const condition: EdgeCondition = {
-      type: branch.condition as ConditionType,
-      value: branch.value,
-    };
-
-    edges.push(createEdge(sourceId, targetId, condition));
   }
 
   // 6. Auto-layout with dagre (left-to-right)

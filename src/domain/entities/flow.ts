@@ -125,7 +125,7 @@ export type MatchMode = 'any' | 'all' | 'exactly';
 
 export interface EdgeCondition {
   type: ConditionType;
-  value: string | number;
+  value: string | number | (string | number)[]; // Array = OR matching (any value matches)
   optionId?: string; // For single-select multiple choice
   optionIds?: string[]; // For multi-select multiple choice
   matchMode?: MatchMode; // How to match multiple selections
@@ -260,13 +260,14 @@ export function createEndNode(position: Position): FlowNode {
 export function createEdge(
   source: string,
   target: string,
-  condition: EdgeCondition | null = null
+  condition: EdgeCondition | null = null,
+  sourceHandle: string | null = null
 ): FlowEdge {
   return {
     id: generateEdgeId(source, target),
     source,
     target,
-    sourceHandle: null,
+    sourceHandle,
     condition,
   };
 }
