@@ -7,6 +7,7 @@
 
 import { motion } from 'framer-motion';
 import { hexWithAlpha, isLightColor, getFontFamilyCSS } from '@/lib/theme';
+import { Watermark } from './Watermark';
 
 interface SubmittedScreenProps {
   title?: string;
@@ -17,6 +18,9 @@ interface SubmittedScreenProps {
   primaryColor?: string;
   backgroundColor?: string;
   fontFamily?: string;
+  subscriptionTier?: string;
+  companyName?: string | null;
+  logoUrl?: string | null;
 }
 
 export function SubmittedScreen({
@@ -28,6 +32,9 @@ export function SubmittedScreen({
   primaryColor = '#6366F1',
   backgroundColor = '#f8fafc',
   fontFamily = 'Geist Sans',
+  subscriptionTier,
+  companyName,
+  logoUrl,
 }: SubmittedScreenProps) {
   const lightBg = isLightColor(backgroundColor);
   const textColor = lightBg ? '#0f172a' : '#f8fafc';
@@ -35,7 +42,7 @@ export function SubmittedScreen({
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{ backgroundColor, fontFamily: getFontFamilyCSS(fontFamily) }}
     >
       <motion.div
@@ -88,6 +95,31 @@ export function SubmittedScreen({
           </motion.div>
         )}
       </motion.div>
+
+      {/* Custom Logo (Pro+) */}
+      {logoUrl && subscriptionTier && subscriptionTier !== 'free' && (
+        <div className="mt-8">
+          <img
+            src={logoUrl}
+            alt={companyName || 'Company logo'}
+            className="h-8 mx-auto object-contain opacity-60"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
+      {/* Watermark for free tier */}
+      {(!subscriptionTier || subscriptionTier === 'free') && (
+        <div className="mt-12">
+          <Watermark
+            textColor={textColor}
+            mutedTextColor={mutedTextColor}
+            companyName={companyName}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import type { FlowNode, FlowEdge } from './flow';
 import type { BackgroundDecoration } from '@/domain/constants/templates';
 
 export type AssessmentStatus = 'draft' | 'published' | 'closed';
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
 
 export type ButtonStyle = 'filled' | 'outline' | 'pill';
 export type CardStyle = 'elevated' | 'bordered' | 'flat';
@@ -45,6 +46,11 @@ export interface AssessmentSettings {
 
   // Custom CSS mode
   customCSSEnabled?: boolean;
+
+  // Subscription & Branding (Premium Features)
+  subscriptionTier?: SubscriptionTier; // Default: 'free'
+  companyName?: string | null; // Custom company name for white labeling
+  logoUrl?: string | null; // Custom logo URL for branding
 }
 
 export interface Assessment {
@@ -119,6 +125,10 @@ export const DEFAULT_ASSESSMENT_SETTINGS: AssessmentSettings = {
   shadowStyle: 'soft',
   glassEffect: false,
   animationPreset: 'smooth',
+  // Subscription & Branding
+  subscriptionTier: 'free',
+  companyName: null,
+  logoUrl: null,
 };
 
 /**

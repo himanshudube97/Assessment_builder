@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { hexWithAlpha, isLightColor, getCardClasses, getFontFamilyCSS } from '@/lib/theme';
 import { ThemeFontLoader } from './ThemeFontLoader';
 import { SubmittedScreen } from './SubmittedScreen';
+import { Watermark } from './Watermark';
 import type {
   FlowNode,
   FlowEdge,
@@ -42,6 +43,9 @@ interface AssessmentFlowProps {
     borderRadius?: string;
     buttonStyle?: string;
     cardStyle?: string;
+    subscriptionTier?: string;
+    companyName?: string | null;
+    logoUrl?: string | null;
   };
   isEmbed?: boolean;
   inviteToken?: string | null;
@@ -388,6 +392,12 @@ export function AssessmentFlow({
           showScore={endNodeData?.showScore}
           score={score?.score}
           maxScore={score?.maxScore}
+          primaryColor={color}
+          backgroundColor={bgColor}
+          fontFamily={fontFamily}
+          subscriptionTier={settings.subscriptionTier}
+          companyName={settings.companyName}
+          logoUrl={settings.logoUrl}
         />
       </ThemeFontLoader>
     );
@@ -426,15 +436,30 @@ export function AssessmentFlow({
             <div className="w-full max-w-2xl">
               <AnimatePresence mode="wait">
                 {!currentNode || currentNode.type === 'start' ? (
-                  <StartScreen
-                    key="start"
-                    data={startNode?.data as StartNodeData}
-                    onStart={handleStart}
-                    primaryColor={color}
-                    textColor={textColor}
-                    mutedTextColor={mutedTextColor}
-                    buttonStyle={getStartButtonStyle()}
-                  />
+                  <>
+                    <StartScreen
+                      key="start"
+                      data={startNode?.data as StartNodeData}
+                      onStart={handleStart}
+                      primaryColor={color}
+                      textColor={textColor}
+                      mutedTextColor={mutedTextColor}
+                      buttonStyle={getStartButtonStyle()}
+                      logoUrl={settings.logoUrl}
+                      companyName={settings.companyName}
+                      subscriptionTier={settings.subscriptionTier}
+                    />
+                    {/* Watermark for free tier on start screen */}
+                    {(!settings.subscriptionTier || settings.subscriptionTier === 'free') && (
+                      <div className="mt-8">
+                        <Watermark
+                          textColor={textColor}
+                          mutedTextColor={mutedTextColor}
+                          companyName={settings.companyName}
+                        />
+                      </div>
+                    )}
+                  </>
                 ) : currentNode.type === 'question' ? (
                   <QuestionScreen
                     key={currentNode.id}
@@ -497,6 +522,16 @@ export function AssessmentFlow({
                   )}
                 </button>
               </div>
+              {/* Watermark for free tier */}
+              {(!settings.subscriptionTier || settings.subscriptionTier === 'free') && (
+                <div className="pb-3">
+                  <Watermark
+                    textColor={textColor}
+                    mutedTextColor={mutedTextColor}
+                    companyName={settings.companyName}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -513,6 +548,9 @@ function StartScreen({
   textColor,
   mutedTextColor,
   buttonStyle,
+  logoUrl,
+  companyName,
+  subscriptionTier,
 }: {
   data?: StartNodeData;
   onStart: () => void;
@@ -520,6 +558,9 @@ function StartScreen({
   textColor: string;
   mutedTextColor: string;
   buttonStyle: React.CSSProperties;
+  logoUrl?: string | null;
+  companyName?: string | null;
+  subscriptionTier?: string;
 }) {
   if (!data) return null;
 
@@ -530,6 +571,20 @@ function StartScreen({
       exit={{ opacity: 0, y: -20 }}
       className="text-center py-12"
     >
+      {/* Custom Logo (Pro+) */}
+      {logoUrl && subscriptionTier && subscriptionTier !== 'free' && (
+        <div className="mb-6">
+          <img
+            src={logoUrl}
+            alt={companyName || 'Company logo'}
+            className="h-12 mx-auto object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
       <h1 className="text-4xl font-bold mb-4" style={{ color: textColor }}>
         {data.title}
       </h1>

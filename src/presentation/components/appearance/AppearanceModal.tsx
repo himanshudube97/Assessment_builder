@@ -6,9 +6,10 @@ import { X, Palette, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TemplateGrid } from './TemplateGrid';
 import { CustomThemePanel } from './CustomThemePanel';
+import { BrandingPanel } from './BrandingPanel';
 import type { AssessmentSettings } from '@/domain/entities/assessment';
 
-type Tab = 'templates' | 'customize';
+type Tab = 'templates' | 'customize' | 'branding';
 
 interface AppearanceModalProps {
   isOpen: boolean;
@@ -112,6 +113,7 @@ export function AppearanceModal({
               {([
                 { key: 'templates' as const, label: 'Templates' },
                 { key: 'customize' as const, label: 'Customize' },
+                { key: 'branding' as const, label: 'Branding' },
               ]).map(({ key, label }) => (
                 <button
                   key={key}
@@ -136,8 +138,13 @@ export function AppearanceModal({
                 currentSettings={pending}
                 onSelect={handleChange}
               />
-            ) : (
+            ) : tab === 'customize' ? (
               <CustomThemePanel
+                settings={pending}
+                onChange={handleChange}
+              />
+            ) : (
+              <BrandingPanel
                 settings={pending}
                 onChange={handleChange}
               />
