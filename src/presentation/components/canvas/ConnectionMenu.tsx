@@ -187,12 +187,12 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
   return (
     <motion.div
       ref={menuRef}
-      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+      initial={{ opacity: 0, y: -12, scale: 0.92 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.95 }}
-      transition={{ duration: 0.15 }}
+      exit={{ opacity: 0, y: -12, scale: 0.92 }}
+      transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
-        'w-72 rounded-xl bg-card border border-border/60 shadow-2xl ring-1 ring-black/5 overflow-hidden',
+        'w-72 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/60 shadow-[0_12px_48px_rgba(0,0,0,0.15)] ring-1 ring-black/5 overflow-hidden',
         'nodrag nopan nowheel'
       )}
       onClick={(e) => e.stopPropagation()}
@@ -218,11 +218,11 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.12 }}
           >
-            <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Route by option
               </span>
-              <button onClick={onClose} className="p-0.5 rounded hover:bg-muted transition-colors">
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted/80 transition-all duration-200 hover:scale-110">
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </div>
@@ -239,8 +239,8 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
                         optionId: opt.id,
                       })}
                       className={cn(
-                        'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
-                        'hover:bg-muted transition-colors'
+                        'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left font-medium',
+                        'hover:bg-muted/80 transition-all duration-200 hover:scale-[1.02] group'
                       )}
                     >
                       <GitBranch className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
@@ -275,11 +275,14 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
                     <button
                       onClick={handleConfirmMultiSelect}
                       className={cn(
-                        'w-full flex items-center justify-center gap-1.5 px-2.5 py-2 mt-1 rounded-lg text-sm font-medium',
-                        'bg-violet-600 text-white hover:bg-violet-700 transition-colors'
+                        'w-full flex items-center justify-center gap-2 px-3 py-2.5 mt-2 rounded-xl text-sm font-semibold',
+                        'bg-gradient-to-br from-violet-500 to-violet-600 text-white',
+                        'shadow-[0_4px_12px_rgba(139,92,246,0.25)]',
+                        'hover:shadow-[0_6px_20px_rgba(139,92,246,0.35)] hover:scale-[1.02]',
+                        'transition-all duration-200'
                       )}
                     >
-                      <GitBranch className="h-3.5 w-3.5" />
+                      <GitBranch className="h-4 w-4" />
                       <span>
                         Create branch
                         {checkedOptionIds.length > 1 && ` (${checkedOptionIds.length} options)`}

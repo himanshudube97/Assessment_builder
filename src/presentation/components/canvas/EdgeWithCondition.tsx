@@ -11,7 +11,10 @@ import { createPortal } from 'react-dom';
 import {
   BaseEdge,
   EdgeLabelRenderer,
+  getBezierPath,
   getSmoothStepPath,
+  getSimpleBezierPath,
+  getStraightPath,
   useReactFlow,
   type EdgeProps,
 } from 'reactflow';
@@ -51,6 +54,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { getNode } = useReactFlow();
   const searchHighlightIds = useCanvasStore((s) => s.searchHighlightIds);
+  const edgeType = useCanvasStore((s) => s.edgeType);
 
   // Compute edge dimming based on search: both ends dimmed = fully dim, one end = partial
   const searchActive = searchHighlightIds !== null;
@@ -58,15 +62,35 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const targetInSearch = searchActive && searchHighlightIds.includes(target);
   const edgeSearchOpacity = !searchActive ? 1 : (sourceInSearch || targetInSearch) ? 0.4 : 0.1;
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  // Calculate edge path based on selected edge type
+  const pathParams = {
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 12,
-  });
+  };
+
+  let edgePath: string;
+  let labelX: number;
+  let labelY: number;
+
+  switch (edgeType) {
+    case 'smoothstep':
+      [edgePath, labelX, labelY] = getSmoothStepPath({ ...pathParams, borderRadius: 12 });
+      break;
+    case 'step':
+      [edgePath, labelX, labelY] = getSmoothStepPath({ ...pathParams, borderRadius: 0 });
+      break;
+    case 'straight':
+      [edgePath, labelX, labelY] = getStraightPath(pathParams);
+      break;
+    case 'bezier':
+    default:
+      [edgePath, labelX, labelY] = getBezierPath(pathParams);
+      break;
+  }
 
   // Get source node to determine available conditions
   const sourceNode = getNode(source);
@@ -75,55 +99,86 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
   const hasSiblingConditions = data?.hasSiblingConditions ?? false;
   const isOptionBased = data?.isOptionBased ?? false;
 
-  // Edge colors: grey by default, blue on hover/select
-  const isActive = selected || isHovered;
-  const strokeColor = isActive
-    ? hasCondition
-      ? '#8B5CF6' // violet-500
-      : '#6366F1' // indigo-500
-    : '#CBD5E1'; // slate-300
+  // Contextual coloring based on source node type
+  const sourceType = sourceNode?.type;
 
-  const glowColor = hasCondition
-    ? 'rgba(139, 92, 246, 0.3)'
-    : 'rgba(99, 102, 241, 0.3)';
+  // Determine contextual color for the edge
+  const getContextualColor = (): { default: string; active: string; glow: string; marker: string } => {
+    // Edges with conditions always get violet tint
+    if (hasCondition) {
+      return {
+        default: '#C4B5FD', // violet-300 (softer)
+        active: '#8B5CF6', // violet-500 (vibrant)
+        glow: 'rgba(139, 92, 246, 0.25)',
+        marker: 'condition',
+      };
+    }
+
+    // Contextual tints based on source node type
+    if (sourceType === 'start') {
+      return {
+        default: '#A7F3D0', // emerald-200 (soft green)
+        active: '#10B981', // emerald-500 (vibrant green)
+        glow: 'rgba(16, 185, 129, 0.25)',
+        marker: 'start',
+      };
+    }
+
+    // Default to blue/indigo for question nodes
+    return {
+      default: '#BFDBFE', // blue-200 (soft blue)
+      active: '#6366F1', // indigo-500 (vibrant)
+      glow: 'rgba(99, 102, 241, 0.25)',
+      marker: 'question',
+    };
+  };
+
+  const contextualColors = getContextualColor();
+  const isActive = selected || isHovered;
+
+  const strokeColor = isActive ? contextualColors.active : contextualColors.default;
+  const glowColor = contextualColors.glow;
 
   // Label for unconditioned edges: "Else" when siblings have conditions, otherwise nothing for start edges
   const defaultLabel = hasSiblingConditions ? 'Else' : 'Default';
 
   return (
     <>
-      <g style={{ opacity: edgeSearchOpacity, transition: 'opacity 0.2s ease' }}>
-      {/* Glow effect for selected/hovered edges */}
-      {(selected || isHovered) && (
-        <path
-          d={edgePath}
-          fill="none"
-          stroke={glowColor}
-          strokeWidth={8}
-          style={{ filter: 'blur(4px)' }}
-        />
-      )}
+      <g style={{ opacity: edgeSearchOpacity, transition: 'opacity 0.3s ease' }}>
+      {/* Subtle ambient glow for all edges - more pronounced on hover */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke={glowColor}
+        strokeWidth={isActive ? 12 : 8}
+        style={{
+          filter: 'blur(6px)',
+          opacity: isActive ? 0.6 : 0.3,
+          transition: 'opacity 0.3s ease, stroke-width 0.3s ease',
+        }}
+      />
 
-      {/* Animated flow dots — only on hover/select */}
+      {/* Animated flow dots — refined with smoother animation */}
       {isActive && (
-        <circle r="3" fill={strokeColor}>
+        <circle r="3" fill={strokeColor} style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.3))' }}>
           <animateMotion
-            dur="1.5s"
+            dur="2s"
             repeatCount="indefinite"
             path={edgePath}
           />
         </circle>
       )}
 
-      {/* Main edge path */}
+      {/* Main edge path - refined stroke with contextual colors (much wider) */}
       <BaseEdge
         path={edgePath}
-        markerEnd={`url(#arrow-${isActive ? (hasCondition ? 'condition' : 'selected') : 'default'})`}
+        markerEnd={`url(#arrow-${isActive ? contextualColors.marker + '-active' : contextualColors.marker})`}
         style={{
           ...style,
-          strokeWidth: selected || isHovered ? 2.5 : 2,
+          strokeWidth: selected || isHovered ? 4 : 2.5,
           stroke: strokeColor,
-          transition: 'stroke 0.2s ease, stroke-width 0.2s ease',
+          transition: 'stroke 0.3s ease, stroke-width 0.3s ease',
+          filter: isActive ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.05))',
         }}
       />
 
@@ -132,7 +187,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={24}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{ cursor: 'pointer' }}
@@ -182,41 +237,47 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
               )}
             </AnimatePresence>
           ) : hasCondition ? (
-            /* Condition badge — clickable to edit */
-            <div className="flex items-center gap-1">
+            /* Condition badge — refined premium style */
+            <div className="flex items-center gap-1.5">
               <motion.div
                 key="condition"
-                initial={{ scale: 0.8, opacity: 0 }}
+                initial={{ scale: 0.85, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
-                  'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300',
-                  'border-2 border-violet-200 dark:border-violet-700',
-                  'shadow-sm transition-all',
-                  'cursor-pointer hover:bg-violet-200 dark:hover:bg-violet-800 hover:shadow-md',
+                  'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold',
+                  'bg-gradient-to-br from-violet-50 to-violet-100/80 dark:from-violet-900/40 dark:to-violet-800/30',
+                  'text-violet-700 dark:text-violet-300',
+                  'border border-violet-200/60 dark:border-violet-700/60',
+                  'shadow-[0_2px_8px_rgba(139,92,246,0.15)] backdrop-blur-sm',
+                  'transition-all duration-300',
+                  'cursor-pointer hover:shadow-[0_4px_16px_rgba(139,92,246,0.25)] hover:scale-105 hover:border-violet-300 dark:hover:border-violet-600',
                 )}
                 onClick={() => setIsEditing(true)}
               >
-                <Zap className="h-3.5 w-3.5" />
+                <Zap className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="max-w-[120px] truncate">
                   {formatCondition(data.condition!)}
                 </span>
               </motion.div>
-              {/* Delete button on hover */}
+              {/* Delete button - refined premium style */}
               <AnimatePresence>
                 {(isHovered || selected) && data?.onDelete && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.5, width: 0 }}
                     animate={{ opacity: 1, scale: 1, width: 'auto' }}
                     exit={{ opacity: 0, scale: 0.5, width: 0 }}
+                    transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowDeleteConfirm(true);
                     }}
                     className={cn(
-                      'p-1 rounded-full transition-colors overflow-hidden',
-                      'bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400',
-                      'hover:bg-red-200 dark:hover:bg-red-800/50'
+                      'p-1.5 rounded-lg transition-all duration-200 overflow-hidden',
+                      'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
+                      'border border-red-200/60 dark:border-red-800/60',
+                      'shadow-sm hover:shadow-md',
+                      'hover:bg-red-100 dark:hover:bg-red-800/30 hover:scale-110'
                     )}
                     title="Delete connection"
                   >
@@ -226,15 +287,15 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
               </AnimatePresence>
             </div>
           ) : (
-            /* Default/Else badge for question-sourced edges */
-            <div className="flex items-center gap-1">
+            /* Default/Else badge - refined premium style */
+            <div className="flex items-center gap-1.5">
               <div
                 className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all',
+                  'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-300',
                   hasSiblingConditions
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700',
-                  !isOptionBased && (isHovered || selected) && 'cursor-pointer border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 shadow-sm'
+                    ? 'bg-gradient-to-br from-amber-50 to-amber-100/80 dark:from-amber-900/30 dark:to-amber-800/20 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-700/60 shadow-[0_2px_8px_rgba(245,158,11,0.12)]'
+                    : 'bg-gradient-to-br from-slate-50 to-slate-100/60 dark:from-slate-800/40 dark:to-slate-900/30 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 shadow-sm',
+                  !isOptionBased && (isHovered || selected) && 'cursor-pointer border-indigo-300/80 dark:border-indigo-600/80 bg-gradient-to-br from-indigo-50 to-indigo-100/60 dark:from-indigo-900/30 dark:to-indigo-800/20 text-indigo-600 dark:text-indigo-400 shadow-[0_2px_12px_rgba(99,102,241,0.2)] scale-105'
                 )}
                 onClick={!isOptionBased && (isHovered || selected) ? () => setIsEditing(true) : undefined}
               >
@@ -245,28 +306,32 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 'auto', opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
-                      className="overflow-hidden whitespace-nowrap text-indigo-500 dark:text-indigo-400"
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden whitespace-nowrap text-indigo-600 dark:text-indigo-400"
                     >
                       — add condition
                     </motion.span>
                   )}
                 </AnimatePresence>
               </div>
-              {/* Delete button on hover */}
+              {/* Delete button - refined premium style */}
               <AnimatePresence>
                 {(isHovered || selected) && data?.onDelete && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.5, width: 0 }}
                     animate={{ opacity: 1, scale: 1, width: 'auto' }}
                     exit={{ opacity: 0, scale: 0.5, width: 0 }}
+                    transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowDeleteConfirm(true);
                     }}
                     className={cn(
-                      'p-1 rounded-full transition-colors overflow-hidden',
-                      'bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400',
-                      'hover:bg-red-200 dark:hover:bg-red-800/50'
+                      'p-1.5 rounded-lg transition-all duration-200 overflow-hidden',
+                      'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
+                      'border border-red-200/60 dark:border-red-800/60',
+                      'shadow-sm hover:shadow-md',
+                      'hover:bg-red-100 dark:hover:bg-red-800/30 hover:scale-110'
                     )}
                     title="Delete connection"
                   >

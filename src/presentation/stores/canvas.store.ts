@@ -146,6 +146,9 @@ interface CanvasState {
   // Layout direction preference
   layoutDirection: 'LR' | 'TB';
 
+  // Edge type preference
+  edgeType: 'bezier' | 'smoothstep' | 'step' | 'straight';
+
   // Derived: true when status is not 'draft' (flow structure is locked)
   isFlowLocked: boolean;
 
@@ -199,6 +202,7 @@ interface CanvasState {
   autoLayout: () => void;
   fullLayout: (direction?: 'LR' | 'TB', spacing?: 'compact' | 'comfortable' | 'spacious') => void;
   setLayoutDirection: (dir: 'LR' | 'TB') => void;
+  setEdgeType: (type: 'bezier' | 'smoothstep' | 'step' | 'straight') => void;
 
   // Spotlight mode
   clearNewlyAddedNode: () => void;
@@ -291,6 +295,7 @@ const initialState = {
   connectionMenuSourceId: null,
   searchHighlightIds: null,
   layoutDirection: 'LR' as const,
+  edgeType: 'bezier' as const,
   isFlowLocked: false,
 };
 
@@ -614,6 +619,10 @@ export const useCanvasStore = create<CanvasState>()(
               set({ edges: savedEdges });
               get().fullLayout(dir);
             }, 50);
+          },
+
+          setEdgeType: (type) => {
+            set({ edgeType: type });
           },
 
           clearNewlyAddedNode: () => {
