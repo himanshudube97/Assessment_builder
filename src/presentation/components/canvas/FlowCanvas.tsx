@@ -85,7 +85,8 @@ function FlowCanvasInner({ onAddNode }: FlowCanvasProps) {
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const sourceNodeType = sourceNode?.type as string | undefined;
       const sourceQuestionType = (sourceNode?.data as { questionType?: string } | undefined)?.questionType;
-      const isOptionBasedSource = !!(sourceQuestionType && OPTION_BASED_TYPES.has(sourceQuestionType));
+      const isOptionBasedSource = !!(sourceQuestionType && OPTION_BASED_TYPES.has(sourceQuestionType))
+        || sourceQuestionType === 'multiple_choice_multi';
 
       // Count sibling edges (other edges from same source)
       const siblingEdges = edges.filter((e) => e.source === edge.source);

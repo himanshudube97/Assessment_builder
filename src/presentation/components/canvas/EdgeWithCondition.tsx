@@ -17,6 +17,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useCanvasStore } from '@/presentation/stores/canvas.store';
 import type { EdgeCondition, ConditionType, MatchMode } from '@/domain/entities/flow';
 
 interface EdgeData {
@@ -164,7 +166,7 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
               )}
             </AnimatePresence>
           ) : hasCondition ? (
-            /* Condition badge — non-clickable for option-based (auto-assigned) */
+            /* Condition badge — clickable to edit */
             <div className="flex items-center gap-1">
               <motion.div
                 key="condition"
@@ -175,9 +177,9 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
                   'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300',
                   'border-2 border-violet-200 dark:border-violet-700',
                   'shadow-sm transition-all',
-                  !isOptionBased && 'cursor-pointer hover:bg-violet-200 dark:hover:bg-violet-800 hover:shadow-md',
+                  'cursor-pointer hover:bg-violet-200 dark:hover:bg-violet-800 hover:shadow-md',
                 )}
-                onClick={!isOptionBased ? () => setIsEditing(true) : undefined}
+                onClick={() => setIsEditing(true)}
               >
                 <Zap className="h-3.5 w-3.5" />
                 <span className="max-w-[120px] truncate">
@@ -259,12 +261,14 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
             </div>
           )}
 
-          {/* Condition Editor Modal — not for start edges or option-based auto-assigned */}
+          {/* Condition Editor Modal */}
           <AnimatePresence>
-            {isEditing && !isFromStart && !isOptionBased && (
+            {isEditing && !isFromStart && (
               <ConditionEditor
                 condition={data?.condition}
                 sourceNode={sourceNode}
+                edgeId={id}
+                sourceNodeId={source}
                 onSave={(condition) => {
                   data?.onConditionChange?.(condition);
                   setIsEditing(false);
@@ -281,13 +285,13 @@ export const EdgeWithCondition = memo(function EdgeWithCondition({
 
 // Format condition for display
 function formatCondition(condition: EdgeCondition): string {
-  const { type, value, optionIds, matchMode } = condition;
+  const { type, value, optionIds } = condition;
 
-  // Handle multi-select conditions
-  if (optionIds && optionIds.length > 0) {
-    const modeLabel = matchMode === 'all' ? 'all of' : matchMode === 'exactly' ? 'exactly' : 'any of';
-    const count = optionIds.length;
-    return `${modeLabel} ${count} option${count > 1 ? 's' : ''}`;
+  // Handle multi-select checkbox conditions (optionIds = array of selected options)
+  if (optionIds && optionIds.length > 0 && Array.isArray(value)) {
+    if (value.length === 1) return `includes "${value[0]}"`;
+    if (value.length === 2) return `includes "${value[0]}" + "${value[1]}"`;
+    return `includes "${value[0]}" +${value.length - 1}`;
   }
 
   switch (type) {
@@ -310,6 +314,8 @@ function formatCondition(condition: EdgeCondition): string {
 interface ConditionEditorProps {
   condition?: EdgeCondition | null;
   sourceNode: ReturnType<ReturnType<typeof useReactFlow>['getNode']>;
+  edgeId: string;
+  sourceNodeId: string;
   onSave: (condition: EdgeCondition | null) => void;
   onClose: () => void;
 }
@@ -317,6 +323,8 @@ interface ConditionEditorProps {
 function ConditionEditor({
   condition,
   sourceNode,
+  edgeId,
+  sourceNodeId,
   onSave,
   onClose,
 }: ConditionEditorProps) {
@@ -329,6 +337,13 @@ function ConditionEditor({
   );
   const [matchMode, setMatchMode] = useState<MatchMode>(
     condition?.matchMode || 'any'
+  );
+  // Get sibling edges for duplicate checking
+  const edges = useCanvasStore((s) => s.edges);
+  const edgeConditionMap = useCanvasStore((s) => s.edgeConditionMap);
+
+  const siblingEdges = edges.filter(
+    (e) => e.source === sourceNodeId && e.id !== edgeId
   );
 
   // Close on click outside
@@ -376,34 +391,78 @@ function ConditionEditor({
     );
   };
 
+  // Check if a new condition duplicates any sibling edge
+  const checkDuplicate = (newCondition: EdgeCondition | null): boolean => {
+    for (const sibling of siblingEdges) {
+      const sibCond = sibling.data?.condition ?? edgeConditionMap[sibling.id];
+
+      // Both are default/else
+      if (!newCondition && !sibCond) return true;
+      if (!newCondition || !sibCond) continue;
+
+      // Single-select: match by optionId
+      if (newCondition.optionId && sibCond.optionId) {
+        if (newCondition.optionId === sibCond.optionId) return true;
+        continue;
+      }
+
+      // Multi-select: match by same set of optionIds (order-independent)
+      if (newCondition.optionIds?.length && sibCond.optionIds?.length) {
+        if (newCondition.optionIds.length === sibCond.optionIds.length) {
+          const sortedNew = [...newCondition.optionIds].sort();
+          const sortedSib = [...sibCond.optionIds].sort();
+          if (sortedNew.every((id, i) => id === sortedSib[i])) return true;
+        }
+        continue;
+      }
+
+      // Text/number: match by type + value
+      if (newCondition.type === sibCond.type && newCondition.value === sibCond.value) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleSave = () => {
+    let newCondition: EdgeCondition | null = null;
+
     if (isMultiSelect && selectedOptionIds.length > 0) {
-      // Multi-select with multiple options
       const selectedTexts = options
         .filter((o) => selectedOptionIds.includes(o.id))
         .map((o) => o.text)
         .join(', ');
-      onSave({
+      newCondition = {
         type,
         value: selectedTexts,
         optionIds: selectedOptionIds,
         matchMode,
-      });
+      };
     } else if (isSingleSelect && optionId) {
       const option = options.find((o) => o.id === optionId);
-      onSave({
+      newCondition = {
         type,
         value: option?.text || value,
         optionId,
-      });
+      };
     } else if (value.trim()) {
-      onSave({
+      newCondition = {
         type,
         value: isRating || isNumeric ? Number(value) : value,
-      });
-    } else {
-      onSave(null);
+      };
     }
+
+    // Check for duplicates before saving
+    if (checkDuplicate(newCondition)) {
+      toast.error(
+        newCondition
+          ? 'Another edge already has this same condition.'
+          : 'A default (Else) edge already exists.'
+      );
+      return;
+    }
+
+    onSave(newCondition);
   };
 
   const handleRemove = () => {

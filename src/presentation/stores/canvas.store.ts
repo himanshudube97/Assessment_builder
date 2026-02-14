@@ -162,7 +162,7 @@ interface CanvasState {
   // Node operations
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
-  onConnect: (connection: Connection) => void;
+  onConnect: (connection: Connection, condition?: EdgeCondition | null) => void;
 
   addNode: (type: 'question' | 'end', position: { x: number; y: number }) => void;
   addQuestionNode: (
@@ -201,7 +201,8 @@ interface CanvasState {
   addNodeWithEdge: (
     type: 'question' | 'end',
     sourceNodeId: string,
-    questionType?: QuestionType
+    questionType?: QuestionType,
+    condition?: EdgeCondition | null
   ) => void;
 
   // Settings
@@ -417,17 +418,19 @@ export const useCanvasStore = create<CanvasState>()(
             }));
           },
 
-          onConnect: (connection) => {
+          onConnect: (connection, condition) => {
             if (get().isFlowLocked) return;
             const state = get();
             const sourceNode = state.nodes.find((n) => n.id === connection.source);
 
-            // Auto-assign condition for option-based question types
-            let autoCondition: EdgeCondition | null = null;
-            if (sourceNode) {
-              // Block if all options already covered
+            let edgeCondition: EdgeCondition | null = null;
+            if (condition !== undefined) {
+              // Explicit condition from ConnectionMenu (null = else/default)
+              edgeCondition = condition;
+            } else if (sourceNode) {
+              // Auto-assign for drag-to-connect
               if (isAtOptionLimit(sourceNode, state.edges, state.edgeConditionMap)) return;
-              autoCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
+              edgeCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
             }
 
             const edgeId = generateEdgeId(connection.source!, connection.target!);
@@ -436,13 +439,13 @@ export const useCanvasStore = create<CanvasState>()(
               id: edgeId,
               type: 'conditionEdge',
               style: { strokeWidth: 2 },
-              ...(autoCondition ? { data: { condition: autoCondition } } : {}),
+              ...(edgeCondition ? { data: { condition: edgeCondition } } : {}),
             };
 
             set((s) => ({
               edges: addEdge(newEdge, s.edges),
-              ...(autoCondition
-                ? { edgeConditionMap: { ...s.edgeConditionMap, [edgeId]: autoCondition } }
+              ...(edgeCondition
+                ? { edgeConditionMap: { ...s.edgeConditionMap, [edgeId]: edgeCondition } }
                 : {}),
               isDirty: true,
             }));
@@ -569,17 +572,22 @@ export const useCanvasStore = create<CanvasState>()(
             set({ connectionMenuSourceId: null });
           },
 
-          addNodeWithEdge: (type, sourceNodeId, questionType) => {
+          addNodeWithEdge: (type, sourceNodeId, questionType, condition) => {
             if (get().isFlowLocked) return;
             const state = get();
             const sourceNode = state.nodes.find((n) => n.id === sourceNodeId);
             if (!sourceNode) return;
 
-            // Block if all options already covered for option-based types
-            if (isAtOptionLimit(sourceNode, state.edges, state.edgeConditionMap)) return;
-
-            // Auto-assign condition for option-based question types
-            const autoCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
+            // Determine edge condition
+            let autoCondition: EdgeCondition | null = null;
+            if (condition !== undefined) {
+              // Explicit condition from ConnectionMenu (null = else/default)
+              autoCondition = condition;
+            } else {
+              // Auto-assign for backward compat
+              if (isAtOptionLimit(sourceNode, state.edges, state.edgeConditionMap)) return;
+              autoCondition = getAutoCondition(sourceNode, state.edges, state.edgeConditionMap);
+            }
 
             // Position the new node to the right of the source, avoiding overlaps
             const baseX = sourceNode.position.x + 350;

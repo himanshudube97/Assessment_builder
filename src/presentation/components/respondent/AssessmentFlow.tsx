@@ -158,6 +158,12 @@ export function AssessmentFlow({
     (condition: EdgeCondition, answer: AnswerValue): boolean => {
       const { type, value } = condition;
 
+      // Multi-select checkbox: ALL selected options must be present in the answer
+      if (condition.optionIds && condition.optionIds.length > 0 && Array.isArray(value)) {
+        const answerArr = Array.isArray(answer) ? answer.map(String) : [String(answer)];
+        return value.every((v) => answerArr.includes(String(v)));
+      }
+
       // OR matching: if value is an array, any match succeeds
       if (Array.isArray(value)) {
         return value.some((v) =>
@@ -204,9 +210,17 @@ export function AssessmentFlow({
         return nodes.find((n) => n.id === outgoingEdges[0].target) || null;
       }
 
+      // Sort by specificity: edges with more optionIds are checked first
+      // (e.g., "Fever + Rash" before "Fever" alone)
+      const sortedEdges = [...outgoingEdges].sort((a, b) => {
+        const aLen = a.condition?.optionIds?.length ?? 0;
+        const bLen = b.condition?.optionIds?.length ?? 0;
+        return bLen - aLen;
+      });
+
       // Check conditional edges — first match wins
       if (answer !== undefined) {
-        for (const edge of outgoingEdges) {
+        for (const edge of sortedEdges) {
           if (edge.condition && evaluateCondition(edge.condition, answer)) {
             return nodes.find((n) => n.id === edge.target) || null;
           }
@@ -214,7 +228,7 @@ export function AssessmentFlow({
       }
 
       // Fall back to default edge (no condition)
-      const defaultEdge = outgoingEdges.find((e) => !e.condition);
+      const defaultEdge = sortedEdges.find((e) => !e.condition);
       if (defaultEdge) {
         return nodes.find((n) => n.id === defaultEdge.target) || null;
       }

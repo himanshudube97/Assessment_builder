@@ -4,7 +4,7 @@
  * ConnectionMenu Component
  * Floating menu that appears when clicking "+" on a node.
  * Allows connecting to existing nodes or creating new ones.
- * Respects edge count limits for option-based question types.
+ * For option-based types, shows an option/condition picker first.
  */
 
 import { useRef, useEffect, useState } from 'react';
@@ -27,10 +27,12 @@ import {
   ChevronRight,
   ArrowLeft,
   AlertCircle,
+  GitBranch,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { useCanvasStore } from '@/presentation/stores/canvas.store';
-import type { QuestionNodeData, QuestionType } from '@/domain/entities/flow';
+import type { QuestionNodeData, QuestionType, EdgeCondition } from '@/domain/entities/flow';
 
 interface ConnectionMenuProps {
   sourceNodeId: string;
@@ -55,9 +57,61 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const edgeConditionMap = useCanvasStore((s) => s.edgeConditionMap);
   const onConnect = useCanvasStore((s) => s.onConnect);
   const addNodeWithEdge = useCanvasStore((s) => s.addNodeWithEdge);
-  const [showTypePicker, setShowTypePicker] = useState(false);
+
+  // Source node info
+  const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+  const sourceData = sourceNode?.data as QuestionNodeData | undefined;
+  const sourceOptions = sourceData?.options;
+  const sourceType = sourceData?.questionType;
+
+  // Single-select option-based types (one option per edge, mutually exclusive)
+  const isSingleSelect =
+    sourceType === 'yes_no' ||
+    sourceType === 'multiple_choice_single' ||
+    sourceType === 'dropdown';
+
+  // Multi-select: checkboxes (multiple options per edge, options can overlap)
+  const isMultiSelect = sourceType === 'multiple_choice_multi';
+
+  // Either type needs the condition picker
+  const needsConditionPick = (isSingleSelect || isMultiSelect) && !!sourceOptions?.length;
+
+  // Count existing edges from this source
+  const outgoingEdges = edges.filter((e) => e.source === sourceNodeId);
+  const hasDefaultEdge = outgoingEdges.some(
+    (e) => {
+      const cond = e.data?.condition ?? edgeConditionMap[e.id];
+      return cond == null;
+    }
+  );
+
+  // Compute uncovered options for single-select types (each option can only be in one edge)
+  const uncoveredOptions = isSingleSelect && sourceOptions
+    ? sourceOptions.filter((opt) => {
+        return !outgoingEdges.some((e) => {
+          const cond = e.data?.condition ?? edgeConditionMap[e.id];
+          return cond?.optionId === opt.id;
+        });
+      })
+    : [];
+
+  // For single-select: at limit when all options are covered AND a default edge exists
+  // For multi-select: never at limit (same option can appear in multiple combo edges)
+  const atTotalLimit = isSingleSelect && uncoveredOptions.length === 0 && hasDefaultEdge;
+
+  // Show condition picker when needed
+  const showConditionPicker = needsConditionPick && !atTotalLimit;
+
+  const [phase, setPhase] = useState<'option-pick' | 'main' | 'type-picker'>(
+    showConditionPicker ? 'option-pick' : 'main'
+  );
+  const [selectedCondition, setSelectedCondition] = useState<EdgeCondition | null | undefined>(undefined);
+
+  // Multi-select checkbox state (for checkbox question types)
+  const [checkedOptionIds, setCheckedOptionIds] = useState<string[]>([]);
 
   // Close on click outside
   useEffect(() => {
@@ -66,7 +120,6 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
         onClose();
       }
     };
-    // Delay to avoid catching the click that opened the menu
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
     }, 0);
@@ -80,8 +133,10 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showTypePicker) {
-          setShowTypePicker(false);
+        if (phase === 'type-picker') {
+          setPhase('main');
+        } else if (phase === 'main' && showConditionPicker) {
+          setPhase('option-pick');
         } else {
           onClose();
         }
@@ -89,38 +144,7 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose, showTypePicker]);
-
-  // Source node info for edge limit checks
-  const sourceNode = nodes.find((n) => n.id === sourceNodeId);
-  const sourceData = sourceNode?.data as QuestionNodeData | undefined;
-  const sourceOptions = sourceData?.options;
-  const sourceType = sourceData?.questionType;
-
-  // Count existing edges from this source
-  const outgoingEdges = edges.filter((e) => e.source === sourceNodeId);
-  const conditionalEdgeCount = outgoingEdges.filter(
-    (e) => e.data?.condition != null
-  ).length;
-  const hasDefaultEdge = outgoingEdges.some(
-    (e) => e.data?.condition == null
-  );
-
-  // Determine max allowed edges for option-based types
-  const isOptionBased =
-    sourceType === 'yes_no' ||
-    sourceType === 'multiple_choice_single' ||
-    sourceType === 'dropdown';
-  const maxConditionalEdges = isOptionBased && sourceOptions
-    ? sourceOptions.length
-    : undefined; // unlimited for text, number, etc.
-
-  // Check if we've reached the edge limit
-  // For option-based: max N conditional + 1 default = N+1 total
-  // For others: unlimited conditional + 1 default
-  const atConditionalLimit =
-    maxConditionalEdges !== undefined && conditionalEdgeCount >= maxConditionalEdges;
-  const atTotalLimit = atConditionalLimit && hasDefaultEdge;
+  }, [onClose, phase, showConditionPicker]);
 
   // Connectable targets: question + end nodes, excluding self and already-connected targets
   const connectedTargets = new Set(
@@ -134,18 +158,62 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
     return true;
   });
 
-  const handleConnectExisting = (targetNodeId: string) => {
-    onConnect({
-      source: sourceNodeId,
-      target: targetNodeId,
-      sourceHandle: null,
-      targetHandle: null,
+  // Single-select: pick one option
+  const handleSelectOption = (condition: EdgeCondition | null) => {
+    setSelectedCondition(condition);
+    setPhase('main');
+  };
+
+  // Multi-select: toggle checkbox
+  const toggleCheckboxOption = (optId: string) => {
+    setCheckedOptionIds((prev) =>
+      prev.includes(optId) ? prev.filter((id) => id !== optId) : [...prev, optId]
+    );
+  };
+
+  // Multi-select: confirm selection and build condition
+  const handleConfirmMultiSelect = () => {
+    if (!sourceOptions || checkedOptionIds.length === 0) return;
+
+    // Check for duplicate: same set of optionIds already exists on another edge
+    const sortedNew = [...checkedOptionIds].sort();
+    const isDuplicate = outgoingEdges.some((e) => {
+      const cond = e.data?.condition ?? edgeConditionMap[e.id];
+      if (!cond?.optionIds?.length) return false;
+      if (cond.optionIds.length !== sortedNew.length) return false;
+      const sortedExisting = [...cond.optionIds].sort();
+      return sortedNew.every((id, i) => id === sortedExisting[i]);
     });
+
+    if (isDuplicate) {
+      toast.error('This combination already has an edge.');
+      onClose();
+      return;
+    }
+
+    const selectedTexts = sourceOptions
+      .filter((o) => checkedOptionIds.includes(o.id))
+      .map((o) => o.text);
+    const condition: EdgeCondition = {
+      type: 'equals',
+      value: selectedTexts,
+      optionIds: checkedOptionIds,
+    };
+    setSelectedCondition(condition);
+    setCheckedOptionIds([]);
+    setPhase('main');
+  };
+
+  const handleConnectExisting = (targetNodeId: string) => {
+    onConnect(
+      { source: sourceNodeId, target: targetNodeId, sourceHandle: null, targetHandle: null },
+      selectedCondition,
+    );
     onClose();
   };
 
   const handleCreateNew = (type: 'question' | 'end', questionType?: QuestionType) => {
-    addNodeWithEdge(type, sourceNodeId, questionType);
+    addNodeWithEdge(type, sourceNodeId, questionType, selectedCondition);
     onClose();
   };
 
@@ -161,6 +229,17 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
     if (node.type === 'end') return <Flag className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />;
     return <HelpCircle className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />;
   };
+
+  // Label for the selected condition shown in the main menu header
+  const conditionLabel = selectedCondition
+    ? Array.isArray(selectedCondition.value)
+      ? selectedCondition.value.length === 1
+        ? `includes "${selectedCondition.value[0]}"`
+        : `includes "${selectedCondition.value[0]}" +${selectedCondition.value.length - 1}`
+      : `= "${selectedCondition.value}"`
+    : selectedCondition === null
+      ? 'Else (default)'
+      : null;
 
   return (
     <motion.div
@@ -180,13 +259,110 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
         <div className="px-3 pt-3 pb-2 flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20">
           <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
           <span>
-            All {sourceOptions?.length} options are covered. Remove a condition to add more branches.
+            All {sourceOptions?.length} options are covered. Remove an edge to add more branches.
           </span>
         </div>
       )}
 
       <AnimatePresence mode="wait">
-        {showTypePicker ? (
+        {phase === 'option-pick' ? (
+          /* Condition picker */
+          <motion.div
+            key="option-pick"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.12 }}
+          >
+            <div className="px-3 pt-3 pb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Route by option
+              </span>
+            </div>
+            <div className="max-h-64 overflow-y-auto px-1.5 pb-1.5">
+              {isSingleSelect ? (
+                /* Single-select: one-click per option */
+                <>
+                  {uncoveredOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => handleSelectOption({
+                        type: 'equals',
+                        value: opt.text,
+                        optionId: opt.id,
+                      })}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
+                        'hover:bg-muted transition-colors'
+                      )}
+                    >
+                      <GitBranch className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+                      <span className="text-foreground truncate">= &quot;{opt.text}&quot;</span>
+                    </button>
+                  ))}
+                </>
+              ) : isMultiSelect && sourceOptions ? (
+                /* Multi-select: checkboxes with confirm button */
+                <>
+                  {sourceOptions.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm cursor-pointer',
+                        'transition-colors',
+                        checkedOptionIds.includes(opt.id)
+                          ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                          : 'hover:bg-muted text-foreground'
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checkedOptionIds.includes(opt.id)}
+                        onChange={() => toggleCheckboxOption(opt.id)}
+                        className="rounded border-input accent-violet-600"
+                      />
+                      <span className="truncate">{opt.text}</span>
+                    </label>
+                  ))}
+                  {checkedOptionIds.length > 0 && (
+                    <button
+                      onClick={handleConfirmMultiSelect}
+                      className={cn(
+                        'w-full flex items-center justify-center gap-1.5 px-2.5 py-2 mt-1 rounded-lg text-sm font-medium',
+                        'bg-violet-600 text-white hover:bg-violet-700 transition-colors'
+                      )}
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                      <span>
+                        Create branch
+                        {checkedOptionIds.length > 1 && ` (${checkedOptionIds.length} options)`}
+                      </span>
+                    </button>
+                  )}
+                </>
+              ) : null}
+
+              {/* Else option — only if no default edge already exists */}
+              {!hasDefaultEdge && (
+                <>
+                  {(isSingleSelect || isMultiSelect) && (
+                    <div className="border-t border-border my-1" />
+                  )}
+                  <button
+                    onClick={() => handleSelectOption(null)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
+                      'hover:bg-muted transition-colors'
+                    )}
+                  >
+                    <GitBranch className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                    <span className="text-foreground">Else (all other options)</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        ) : phase === 'type-picker' ? (
           /* Question type picker sub-menu */
           <motion.div
             key="type-picker"
@@ -197,7 +373,7 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
           >
             <div className="px-3 pt-3 pb-1.5 flex items-center gap-2">
               <button
-                onClick={() => setShowTypePicker(false)}
+                onClick={() => setPhase('main')}
                 className="p-0.5 rounded hover:bg-muted transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground" />
@@ -211,11 +387,9 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
                 <button
                   key={qt.type}
                   onClick={() => handleCreateNew('question', qt.type)}
-                  disabled={atTotalLimit}
                   className={cn(
                     'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left',
                     'hover:bg-muted transition-colors',
-                    atTotalLimit && 'opacity-40 cursor-not-allowed'
                   )}
                 >
                   <span className="text-indigo-500 flex-shrink-0">{qt.icon}</span>
@@ -225,14 +399,34 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
             </div>
           </motion.div>
         ) : (
-          /* Main menu */
+          /* Main menu — target picker */
           <motion.div
             key="main-menu"
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: showConditionPicker ? 20 : -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.12 }}
           >
+            {/* Show selected condition label */}
+            {conditionLabel && (
+              <div className="px-3 pt-3 pb-1.5 flex items-center gap-2">
+                <button
+                  onClick={() => setPhase('option-pick')}
+                  className="p-0.5 rounded hover:bg-muted transition-colors"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <span className={cn(
+                  'text-xs font-medium px-2 py-0.5 rounded-full',
+                  selectedCondition
+                    ? 'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300'
+                    : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+                )}>
+                  {conditionLabel}
+                </span>
+              </div>
+            )}
+
             {/* Existing nodes */}
             {connectableNodes.length > 0 && !atTotalLimit && (
               <>
@@ -261,33 +455,31 @@ export function ConnectionMenu({ sourceNodeId, onClose }: ConnectionMenuProps) {
             )}
 
             {/* Create new */}
-            <div className="p-1.5">
-              <button
-                onClick={() => setShowTypePicker(true)}
-                disabled={atTotalLimit}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm',
-                  'hover:bg-muted transition-colors',
-                  atTotalLimit && 'opacity-40 cursor-not-allowed'
-                )}
-              >
-                <Plus className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-                <span className="flex-1 text-left text-foreground">New Question</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => handleCreateNew('end')}
-                disabled={atTotalLimit}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm',
-                  'hover:bg-muted transition-colors',
-                  atTotalLimit && 'opacity-40 cursor-not-allowed'
-                )}
-              >
-                <Flag className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
-                <span className="text-foreground">End Screen</span>
-              </button>
-            </div>
+            {!atTotalLimit && (
+              <div className="p-1.5">
+                <button
+                  onClick={() => setPhase('type-picker')}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm',
+                    'hover:bg-muted transition-colors',
+                  )}
+                >
+                  <Plus className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                  <span className="flex-1 text-left text-foreground">New Question</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => handleCreateNew('end')}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm',
+                    'hover:bg-muted transition-colors',
+                  )}
+                >
+                  <Flag className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+                  <span className="text-foreground">End Screen</span>
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
