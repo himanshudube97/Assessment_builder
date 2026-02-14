@@ -442,6 +442,15 @@ function FlowCanvasInner() {
           />
         </Panel>
 
+        {/* Flow stats badge */}
+        <Panel position="bottom-right">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/90 backdrop-blur-sm border border-border/40 shadow-sm text-xs text-muted-foreground font-medium">
+            <span>{nodes.length} {nodes.length === 1 ? 'node' : 'nodes'}</span>
+            <span className="text-border">•</span>
+            <span>{edges.length} {edges.length === 1 ? 'connection' : 'connections'}</span>
+          </div>
+        </Panel>
+
         {/* Toolbar */}
         <Panel position="top-right" className="flex gap-2">
           <button
