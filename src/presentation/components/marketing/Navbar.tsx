@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AssessioLogo } from '@/components/ui/logo';
 
@@ -10,6 +10,33 @@ const navLinks = [
   { href: '/features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
 ];
+
+function ThemeToggle() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    setIsDark(root.classList.contains('dark'));
+  }, []);
+
+  const toggle = () => {
+    const root = document.documentElement;
+    const next = !isDark;
+    root.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+    setIsDark(next);
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+    </button>
+  );
+}
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -56,7 +83,8 @@ export function Navbar() {
           </div>
 
           {/* Desktop CTA Buttons */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/login"
               className="text-muted-foreground hover:text-foreground transition-colors font-medium"
@@ -73,17 +101,20 @@ export function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-          >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
+          <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
